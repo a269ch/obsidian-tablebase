@@ -1,0 +1,9 @@
+{
+  "id": "tablebase",
+  "name": "TableBase",
+  "version": "0.1.0",
+  "minAppVersion": "1.0.0",
+  "description": "Turn standard Markdown tables into interactive Notion-like databases: Kanban board view, multi-select tags, date pickers, calculations, and advanced filters — with zero lock-in.",
+  "author": "Aleksei Che",
+  "isDesktopOnly": false
+}

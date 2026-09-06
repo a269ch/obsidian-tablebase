@@ -1,0 +1,1704 @@
+/* =========================================================
+   Notion-Style Database Table & Multi-Select Plugin Styles
+   ========================================================= */
+
+/* --- CSS Variables & Theme Constants --- */
+:root {
+  --ms-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --ms-badge-font-size: 0.82em;
+  --ms-badge-radius: 4px;
+  --ms-border: var(--background-modifier-border, rgba(55, 53, 47, 0.12));
+  --ms-bg-hover: var(--background-modifier-hover, rgba(55, 53, 47, 0.06));
+  --ms-bg-subtle: var(--background-secondary, #f7f6f3);
+  --ms-text-muted: var(--text-muted, #787774);
+  --ms-blue-accent: var(--interactive-accent, #2383e2);
+  --ms-focus-ring: #2383e2;
+  --ms-focus-col-bg: rgba(35, 131, 226, 0.05);
+  --ms-focus-row-bg: rgba(35, 131, 226, 0.03);
+  --ms-focus-th-bg: rgba(35, 131, 226, 0.09);
+  --ms-card-bg: var(--background-primary, #ffffff);
+  --ms-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.theme-dark {
+  --ms-border: rgba(255, 255, 255, 0.1);
+  --ms-bg-hover: rgba(255, 255, 255, 0.06);
+  --ms-bg-subtle: rgba(255, 255, 255, 0.04);
+  --ms-text-muted: #9b9a97;
+  --ms-focus-col-bg: rgba(46, 170, 220, 0.07);
+  --ms-focus-row-bg: rgba(46, 170, 220, 0.04);
+  --ms-focus-th-bg: rgba(46, 170, 220, 0.12);
+  --ms-card-bg: var(--background-secondary, #202020);
+  --ms-card-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* --- Notion Database Main Container --- */
+.ms-notion-database-container,
+.ms-notion-kanban-container {
+  margin: 1.25rem 0;
+  border: 1px solid var(--ms-border);
+  border-radius: 8px;
+  background-color: var(--background-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  font-family: var(--ms-font);
+  font-size: 14px;
+  outline: none;
+  overflow: hidden;
+}
+
+/* --- Database Top Bar --- */
+.ms-db-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--ms-border);
+  background: var(--ms-bg-subtle);
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+  gap: 12px;
+}
+
+.ms-db-header-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ms-db-view-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  font-weight: 500;
+  font-size: 0.88em;
+  color: var(--ms-text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1.2;
+}
+
+.ms-db-view-tab-btn:hover {
+  background-color: var(--ms-bg-hover);
+  color: var(--text-normal);
+}
+
+.ms-db-view-tab-btn.is-active {
+  font-weight: 600;
+  color: var(--text-normal);
+  background-color: var(--background-primary);
+  border-color: var(--ms-border);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.ms-view-tab-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.ms-topbar-divider {
+  width: 1px;
+  height: 16px;
+  background-color: var(--ms-border);
+  margin: 0 6px;
+  flex-shrink: 0;
+}
+
+.ms-db-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ms-db-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 0.85em;
+  font-weight: 500;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ms-text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ms-db-action-btn:hover {
+  background-color: var(--ms-bg-hover);
+  color: var(--text-normal);
+}
+
+.ms-db-action-btn.is-active {
+  background-color: rgba(35, 131, 226, 0.12);
+  color: var(--ms-blue-accent);
+}
+
+.ms-group-by-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85em;
+  color: var(--ms-text-muted);
+  font-weight: 500;
+}
+
+.ms-group-select {
+  padding: 3px 8px;
+  font-size: 0.9em;
+  font-weight: 500;
+  border: 1px solid var(--ms-border);
+  border-radius: 5px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.ms-group-select:hover,
+.ms-group-select:focus {
+  border-color: var(--ms-blue-accent);
+}
+
+.ms-db-search-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.ms-db-search-icon {
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ms-text-muted);
+  pointer-events: none;
+  width: 14px;
+  height: 14px;
+}
+
+.ms-db-search-icon svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.ms-db-search-wrap input.ms-db-search-input,
+input[type="text"].ms-db-search-input {
+  padding: 4px 10px 4px 30px !important;
+  font-size: 0.85em;
+  border: 1px solid var(--ms-border);
+  border-radius: 5px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  width: 140px;
+  height: 28px;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease;
+}
+
+.ms-db-search-wrap input.ms-db-search-input:focus,
+input[type="text"].ms-db-search-input:focus {
+  border-color: var(--ms-blue-accent);
+  outline: none;
+}
+
+button.ms-db-primary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 10px;
+  height: 28px;
+  font-size: 0.85em;
+  font-weight: 500;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  border-radius: 5px;
+  background: transparent !important;
+  color: var(--ms-text-muted) !important;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+}
+
+button.ms-db-primary-btn:hover {
+  background-color: var(--ms-bg-hover) !important;
+  color: var(--text-normal) !important;
+}
+
+/* --- Filter & Sort Panels --- */
+.ms-table-toolbar-wrapper {
+  background: var(--ms-bg-subtle);
+  border-bottom: 1px solid var(--ms-border);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ms-rules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ms-filter-rule-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ms-rule-prefix {
+  font-size: 0.85em;
+  font-weight: 500;
+  color: var(--ms-text-muted);
+}
+
+.ms-filter-conjunction-select,
+.ms-filter-column-select,
+.ms-filter-operator-select,
+.ms-rule-col-select,
+.ms-rule-op-select {
+  padding: 4px 10px;
+  font-size: 0.85em;
+  border: 1px solid var(--ms-border);
+  border-radius: 5px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.ms-filter-conjunction-select:hover,
+.ms-filter-column-select:hover,
+.ms-filter-operator-select:hover,
+.ms-rule-col-select:hover,
+.ms-rule-op-select:hover {
+  border-color: var(--ms-blue-accent);
+}
+
+.ms-filter-value-input {
+  padding: 4px 10px;
+  font-size: 0.85em;
+  border: 1px solid var(--ms-border);
+  border-radius: 5px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  min-width: 140px;
+}
+
+.ms-filter-tag-picker-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: 0.85em;
+  border: 1px solid var(--ms-border);
+  border-radius: 5px;
+  background: var(--background-primary);
+  color: var(--ms-text-muted);
+  cursor: pointer;
+}
+
+/* Panel Footer (Generous button gap and distinct styling) */
+.ms-panel-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 4px;
+}
+
+.ms-add-filter-btn,
+.ms-add-rule-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-size: 0.85em;
+  font-weight: 500;
+  border: 1px solid var(--ms-border);
+  border-radius: 5px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ms-add-filter-btn:hover,
+.ms-add-rule-btn:hover {
+  background: var(--ms-bg-hover);
+  border-color: var(--ms-blue-accent);
+}
+
+.ms-clear-filters-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  font-size: 0.85em;
+  font-weight: 500;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-error, #eb5757);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ms-clear-filters-btn:hover {
+  background: rgba(235, 87, 87, 0.1);
+  text-decoration: none;
+}
+
+.ms-filter-empty-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.ms-empty-text {
+  font-size: 0.85em;
+  color: var(--ms-text-muted);
+}
+
+.ms-delete-rule-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--ms-text-muted);
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.ms-delete-rule-btn:hover {
+  background: var(--ms-bg-hover);
+  color: var(--text-error, #eb5757);
+}
+
+/* --- Scrollable Grid Table --- */
+.ms-db-table-scroll-wrapper {
+  overflow-x: auto;
+  width: 100%;
+  position: relative;
+}
+
+.ms-db-grid-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: auto;
+  margin: 0 !important;
+}
+
+/* --- Sticky Row Numbers Column Support --- */
+.ms-db-grid-table.has-row-numbers .ms-db-th-index,
+.ms-db-grid-table.has-row-numbers .ms-db-td-index {
+  position: sticky !important;
+  left: 0 !important;
+  z-index: 20 !important;
+  background: var(--background-primary) !important;
+  border-right: none !important;
+  box-shadow: -10px 0 0 0 var(--background-primary), inset -1px 0 0 0 var(--ms-border) !important;
+}
+
+.ms-db-grid-table.has-row-numbers thead .ms-db-th-index {
+  background: var(--background-primary) !important;
+  box-shadow: -10px 0 0 0 var(--background-primary), inset -1px 0 0 0 var(--ms-border) !important;
+}
+
+.ms-db-grid-table.has-row-numbers .ms-db-tr.is-row-focused .ms-db-td-index {
+  background: linear-gradient(var(--ms-focus-th-bg), var(--ms-focus-th-bg)), var(--background-primary) !important;
+  color: var(--ms-blue-accent) !important;
+  font-weight: 600;
+  box-shadow: -10px 0 0 0 var(--ms-focus-th-bg), -10px 0 0 0 var(--background-primary), inset -1px 0 0 0 var(--ms-border) !important;
+}
+
+.ms-db-grid-table.has-row-numbers .ms-db-tr:hover:not(.is-row-focused) .ms-db-td-index {
+  background: linear-gradient(var(--ms-bg-hover), var(--ms-bg-hover)), var(--background-primary) !important;
+  box-shadow: -10px 0 0 0 var(--ms-bg-hover), -10px 0 0 0 var(--background-primary), inset -1px 0 0 0 var(--ms-border) !important;
+}
+
+/* --- Table Headers --- */
+.ms-db-grid-table thead tr {
+  height: 34px;
+}
+
+.ms-db-th {
+  position: relative;
+  padding: 0;
+  height: 34px;
+  font-weight: 500;
+  font-size: 0.85em;
+  color: var(--ms-text-muted);
+  border-bottom: 1px solid var(--ms-border);
+  border-right: 1px solid var(--ms-border);
+  background: var(--background-primary);
+  user-select: none;
+  min-width: 110px;
+  vertical-align: middle;
+  box-sizing: border-box;
+}
+
+.ms-db-th:hover {
+  background: var(--ms-bg-hover);
+}
+
+.ms-db-th.is-col-focused {
+  background-color: var(--ms-focus-th-bg) !important;
+  color: var(--text-normal) !important;
+  border-bottom: 2px solid var(--ms-blue-accent) !important;
+}
+
+.ms-db-th.is-col-focused .ms-db-type-icon {
+  color: var(--ms-blue-accent) !important;
+  opacity: 1 !important;
+}
+
+.ms-db-th.is-col-focused .ms-db-col-name {
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.ms-db-th.is-dragging-col {
+  opacity: 0.4;
+}
+
+.ms-db-th.is-col-drop-target {
+  border-left: 3px solid var(--ms-blue-accent) !important;
+}
+
+.ms-db-th-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  cursor: pointer;
+  height: 34px;
+  min-height: 34px;
+  max-height: 34px;
+  box-sizing: border-box;
+}
+
+.ms-db-type-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.ms-db-type-icon svg {
+  width: 13px;
+  height: 13px;
+  display: block;
+}
+
+.ms-db-col-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.ms-index-strut {
+  visibility: hidden;
+  width: 0 !important;
+  max-width: 0 !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden;
+  line-height: 1.2;
+  font-size: 0.85em;
+  font-weight: 500;
+  flex: 0 0 0px !important;
+}
+
+.ms-db-sort-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ms-blue-accent);
+  flex-shrink: 0;
+  margin-left: 2px;
+}
+
+.ms-col-resizer {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 10;
+}
+
+.ms-col-resizer:hover {
+  background-color: var(--ms-blue-accent);
+}
+
+.ms-db-th-index {
+  width: 42px !important;
+  min-width: 42px !important;
+  max-width: 42px !important;
+  padding: 0 !important;
+  text-align: center;
+  border-bottom: 1px solid var(--ms-border);
+  border-right: 1px solid var(--ms-border);
+  vertical-align: middle;
+  height: 34px;
+  box-sizing: border-box;
+}
+
+.ms-db-th-index-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 !important;
+  gap: 0 !important;
+  width: 100%;
+  height: 34px;
+  min-height: 34px;
+  max-height: 34px;
+  box-sizing: border-box;
+}
+
+.ms-db-th-index-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: var(--ms-text-muted);
+  opacity: 0.85;
+}
+
+.ms-db-th-add-col {
+  width: 36px;
+  min-width: 36px;
+  max-width: 36px;
+  border-bottom: 1px solid var(--ms-border);
+  border-right: 1px solid var(--ms-border);
+  padding: 0;
+  text-align: center;
+  vertical-align: middle;
+  background: var(--background-primary);
+  height: 100%;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.ms-db-th-add-col button.ms-db-add-col-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 31px;
+  margin: 0;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+  color: var(--ms-text-muted);
+  cursor: pointer;
+  font-size: 1.15em;
+  font-weight: 300;
+  line-height: 1;
+  border-radius: 0;
+  padding: 0 !important;
+  pointer-events: none;
+  transition: color 0.12s ease;
+}
+
+.ms-db-th-add-col button.ms-db-add-col-btn:hover,
+.ms-db-th-add-col button.ms-db-add-col-btn:focus,
+.ms-db-th-add-col button.ms-db-add-col-btn:active {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  outline: none !important;
+}
+
+.ms-db-td-spacer,
+.ms-db-td-add-col {
+  width: 36px;
+  min-width: 36px;
+  max-width: 36px;
+  border-bottom: 1px solid var(--ms-border);
+  border-right: 1px solid var(--ms-border);
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.ms-db-calc-tr .ms-db-td-add-col {
+  border-bottom: none !important;
+}
+
+/* Whole Add Column column hover highlight */
+.ms-db-grid-table.is-add-col-hovered .ms-db-th-add-col,
+.ms-db-grid-table.is-add-col-hovered .ms-db-td-add-col {
+  background-color: var(--ms-bg-hover) !important;
+}
+
+.ms-db-grid-table.is-add-col-hovered .ms-db-add-col-btn {
+  color: var(--text-normal) !important;
+}
+
+/* Whole Add Column column active/clicked highlight */
+.ms-db-grid-table.is-add-col-active .ms-db-th-add-col {
+  background-color: var(--ms-focus-th-bg) !important;
+  border-bottom: 2px solid var(--ms-blue-accent) !important;
+}
+
+.ms-db-grid-table.is-add-col-active .ms-db-td-add-col {
+  background-color: var(--ms-focus-col-bg) !important;
+}
+
+.ms-db-grid-table.is-add-col-active .ms-db-add-col-btn {
+  color: var(--ms-blue-accent) !important;
+}
+
+/* --- Table Cells --- */
+.ms-db-tr {
+  transition: background-color 0.1s ease;
+}
+
+.ms-db-tr:hover {
+  background-color: rgba(55, 53, 47, 0.02);
+}
+
+.theme-dark .ms-db-tr:hover {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+.ms-db-tr.is-dragging-row {
+  opacity: 0.4;
+}
+
+.ms-db-tr.is-row-drop-target {
+  border-top: 3px solid var(--ms-blue-accent) !important;
+}
+
+.ms-db-tr.is-row-focused {
+  background-color: var(--ms-focus-row-bg) !important;
+}
+
+.ms-db-tr.is-row-focused:hover {
+  background-color: var(--ms-focus-row-bg) !important;
+}
+
+.ms-db-td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--ms-border);
+  border-right: 1px solid var(--ms-border);
+  vertical-align: middle;
+  min-height: 32px;
+  cursor: default;
+  transition: background-color 0.12s ease;
+}
+
+.ms-db-td.is-col-focused {
+  background-color: var(--ms-focus-col-bg);
+}
+
+.ms-db-td.is-focused {
+  outline: 2px solid var(--ms-focus-ring) !important;
+  outline-offset: -2px;
+  background-color: var(--background-primary) !important;
+  z-index: 10 !important;
+}
+
+.ms-db-td.is-editing {
+  padding: 0 !important;
+}
+
+.ms-db-td-index {
+  width: 42px !important;
+  min-width: 42px !important;
+  max-width: 42px !important;
+  box-sizing: border-box !important;
+  text-align: center;
+  font-size: 0.8em;
+  color: var(--ms-text-muted);
+  border-bottom: 1px solid var(--ms-border);
+  user-select: none;
+  padding: 6px 0;
+  cursor: grab;
+}
+
+.ms-cell-text-wrapper {
+  min-height: 20px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.ms-cell-text-wrapper.is-number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.ms-inline-cell-input,
+.ms-db-grid-table .ms-db-td input.ms-inline-cell-input,
+.theme-dark .ms-db-grid-table .ms-db-td input.ms-inline-cell-input,
+.theme-light .ms-db-grid-table .ms-db-td input.ms-inline-cell-input {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 32px !important;
+  border: none !important;
+  outline: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 6px 10px !important;
+  margin: 0 !important;
+  font-family: inherit !important;
+  font-size: inherit !important;
+  line-height: 1.4 !important;
+  color: inherit !important;
+  display: block !important;
+  box-sizing: border-box !important;
+}
+
+.ms-inline-cell-input.is-number,
+.ms-db-grid-table .ms-db-td input.ms-inline-cell-input.is-number {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+.ms-inline-cell-input:focus,
+.ms-db-grid-table .ms-db-td input.ms-inline-cell-input:focus,
+.theme-dark .ms-db-grid-table .ms-db-td input.ms-inline-cell-input:focus,
+.theme-light .ms-db-grid-table .ms-db-td input.ms-inline-cell-input:focus {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.ms-kanban-card .ms-kanban-prop-badge input.ms-inline-cell-input {
+  width: auto !important;
+  min-width: 40px !important;
+  height: auto !important;
+  min-height: unset !important;
+  padding: 0 2px !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+}
+
+.ms-kanban-card .ms-kanban-card-title input.ms-inline-cell-input {
+  width: 100% !important;
+  height: auto !important;
+  min-height: unset !important;
+  padding: 2px 4px !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+}
+
+/* --- Checkbox Cell --- */
+.ms-cell-checkbox-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ms-notion-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--ms-blue-accent);
+}
+
+/* --- Date Cell --- */
+.ms-cell-date-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9em;
+  color: var(--text-normal);
+  cursor: pointer;
+}
+
+.ms-date-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--ms-text-muted);
+}
+
+/* --- Multi-Select Badges & Cells --- */
+.ms-cell-badges-container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  min-height: 20px;
+}
+
+.ms-tag-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: var(--ms-badge-radius);
+  font-size: var(--ms-badge-font-size);
+  font-weight: 500;
+  line-height: 1.25;
+  white-space: nowrap;
+  user-select: none;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+  background-color: var(--tag-bg-light);
+  color: var(--tag-text-light);
+}
+
+.theme-dark .ms-tag-badge {
+  background-color: var(--tag-bg-dark);
+  color: var(--tag-text-dark);
+}
+
+.ms-tag-badge.clickable {
+  cursor: pointer;
+}
+
+.ms-tag-badge.clickable:hover {
+  filter: brightness(0.93);
+}
+
+.theme-dark .ms-tag-badge.clickable:hover {
+  filter: brightness(1.15);
+}
+
+.ms-cell-empty-placeholder {
+  color: var(--ms-text-muted);
+  font-style: italic;
+  font-size: 0.85em;
+  opacity: 0.5;
+}
+
+/* --- Bottom + New Row (inside tbody) --- */
+.ms-db-add-row-tr {
+  background: transparent;
+}
+
+.ms-db-add-row-tr:hover td.ms-db-td-index {
+  background: var(--ms-bg-hover);
+}
+
+.ms-db-add-row-td {
+  padding: 0 !important;
+  border-bottom: 1px solid var(--ms-border) !important;
+  border-right: none !important;
+}
+
+button.ms-db-add-row-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 12px !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+  color: var(--ms-text-muted) !important;
+  font-size: 0.85em;
+  font-weight: 400;
+  cursor: pointer;
+  text-align: left;
+  border-radius: 0 !important;
+  transition: all 0.12s ease;
+}
+
+button.ms-db-add-row-btn:hover {
+  background: var(--ms-bg-hover) !important;
+  color: var(--text-normal) !important;
+}
+
+/* --- Table Footer Calculations (tfoot) --- */
+.ms-db-tfoot {
+  background: var(--ms-bg-subtle);
+}
+
+.ms-db-calc-tr {
+  border-top: 1px solid var(--ms-border);
+}
+
+.ms-db-calc-td {
+  font-size: 0.8em;
+  padding: 6px 10px;
+  color: var(--ms-text-muted);
+  cursor: pointer;
+  user-select: none;
+  border-bottom: none;
+  border-right: 1px solid var(--ms-border);
+}
+
+.ms-db-calc-td:hover {
+  background: var(--ms-bg-hover);
+  color: var(--text-normal);
+}
+
+.ms-calc-placeholder {
+  opacity: 0.4;
+  transition: opacity 0.12s ease;
+}
+
+.ms-db-calc-td:hover .ms-calc-placeholder {
+  opacity: 1;
+}
+
+.ms-calc-index {
+  width: 42px;
+  min-width: 42px;
+  max-width: 42px;
+  border-bottom: none;
+}
+
+.ms-calc-label {
+  font-weight: 500;
+}
+
+.ms-calc-val {
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+/* --- Kanban Board View Styles --- */
+.ms-kanban-board-wrapper {
+  display: flex;
+  gap: 14px;
+  padding: 14px;
+  overflow-x: auto;
+  min-height: 380px;
+  align-items: flex-start;
+  background: var(--background-secondary, #fafafa);
+}
+
+.theme-dark .ms-kanban-board-wrapper {
+  background: var(--background-primary, #191919);
+}
+
+.ms-kanban-column {
+  flex: 0 0 250px;
+  width: 250px;
+  background: var(--background-primary);
+  border: 1px solid var(--ms-border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 200px);
+}
+
+.theme-dark .ms-kanban-column {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.ms-kanban-column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--ms-border);
+}
+
+.ms-kanban-column-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ms-kanban-no-status-title {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--ms-text-muted);
+}
+
+.ms-kanban-count-pill {
+  font-size: 0.75em;
+  background: var(--ms-bg-hover);
+  color: var(--ms-text-muted);
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.ms-kanban-add-card-icon-btn {
+  border: none;
+  background: transparent;
+  font-size: 1.1em;
+  color: var(--ms-text-muted);
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: 3px;
+}
+
+.ms-kanban-add-card-icon-btn:hover {
+  background: var(--ms-bg-hover);
+  color: var(--text-normal);
+}
+
+.ms-kanban-cards-list {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  min-height: 80px;
+}
+
+.ms-kanban-cards-list.is-drag-over {
+  background: rgba(35, 131, 226, 0.08);
+  border-radius: 6px;
+}
+
+.ms-kanban-card {
+  background: var(--ms-card-bg);
+  border: 1px solid var(--ms-border);
+  border-radius: 6px;
+  padding: 10px;
+  box-shadow: var(--ms-card-shadow);
+  cursor: grab;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  user-select: none;
+}
+
+.ms-kanban-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
+}
+
+.ms-kanban-card.is-dragging {
+  opacity: 0.4;
+}
+
+.ms-kanban-card.is-card-drop-target {
+  border-top: 2px solid var(--ms-blue-accent) !important;
+}
+
+.ms-kanban-card-title {
+  font-weight: 600;
+  font-size: 0.9em;
+  color: var(--text-normal);
+  margin-bottom: 6px;
+}
+
+.ms-kanban-card-properties {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.ms-kanban-prop-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--ms-bg-hover);
+  color: var(--ms-text-muted);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.12s ease;
+}
+
+.ms-kanban-prop-badge:hover {
+  background: var(--ms-bg-active, rgba(0, 0, 0, 0.12));
+  color: var(--text-normal);
+}
+
+.ms-kanban-bottom-add-btn {
+  width: 100%;
+  padding: 7px 12px;
+  border: none;
+  border-top: 1px solid var(--ms-border);
+  background: transparent;
+  color: var(--ms-text-muted);
+  font-size: 0.82em;
+  cursor: pointer;
+  text-align: left;
+}
+
+.ms-kanban-bottom-add-btn:hover {
+  background: var(--ms-bg-hover);
+  color: var(--text-normal);
+}
+
+/* --- Dropdown Menus --- */
+.ms-col-header-menu {
+  background: var(--background-primary);
+  border: 1px solid var(--ms-border);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  min-width: 190px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  z-index: 1000;
+}
+
+.ms-col-menu-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px 6px 4px;
+}
+
+.ms-col-menu-type-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--ms-text-muted);
+}
+
+.ms-col-menu-name-input,
+input[type="text"].ms-col-menu-name-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--text-normal);
+  background: var(--background-secondary, rgba(0, 0, 0, 0.03));
+  border: 1px solid var(--ms-border);
+  border-radius: 5px;
+  padding: 4px 8px !important;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ms-col-menu-name-input:focus,
+input[type="text"].ms-col-menu-name-input:focus {
+  border-color: var(--ms-blue-accent, #2383e2);
+  background: var(--background-primary);
+  box-shadow: 0 0 0 1px var(--ms-blue-accent, #2383e2);
+}
+
+.ms-modal-rename-column {
+  padding: 4px 8px;
+}
+
+.ms-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  font-size: 0.88em;
+  font-weight: 400;
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--text-normal);
+  transition: all 0.1s ease;
+}
+
+.ms-menu-item:hover {
+  background-color: var(--ms-bg-hover);
+}
+
+.ms-menu-item.is-selected {
+  background-color: rgba(35, 131, 226, 0.08);
+  font-weight: 500;
+}
+
+.ms-prop-icon,
+.ms-menu-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--ms-text-muted);
+}
+
+.ms-prop-check,
+.ms-check-icon,
+.ms-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  color: var(--ms-blue-accent);
+  flex-shrink: 0;
+}
+
+.ms-menu-item.is-danger {
+  color: var(--text-error, #eb5757);
+}
+
+.ms-menu-divider {
+  height: 1px;
+  background: var(--ms-border);
+  margin: 4px 0;
+}
+
+.ms-menu-section-title {
+  font-size: 0.75em;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ms-text-muted);
+  padding: 4px 8px;
+}
+
+/* --- Date Picker Popover --- */
+.ms-date-picker-popover {
+  width: 250px;
+  padding: 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  background: var(--background-primary);
+}
+
+.ms-date-month-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-weight: 600;
+  font-size: 0.9em;
+}
+
+.ms-date-month-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+}
+
+.ms-date-label-btn {
+  padding: 2px 5px;
+  border-radius: 4px;
+  transition: all 0.1s ease;
+}
+
+.ms-date-label-btn:hover {
+  background: var(--ms-bg-hover);
+  color: var(--ms-blue-accent);
+}
+
+.ms-date-grid-picker {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.ms-date-grid-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 0;
+  font-size: 0.85em;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-normal);
+  background: var(--ms-bg-subtle, rgba(0, 0, 0, 0.03));
+  border: 1px solid transparent;
+  transition: all 0.1s ease;
+}
+
+.ms-date-grid-item:hover {
+  background: var(--ms-bg-hover);
+  border-color: var(--ms-border);
+}
+
+.ms-date-grid-item.is-selected {
+  background-color: var(--ms-blue-accent) !important;
+  color: #ffffff !important;
+  font-weight: 600;
+}
+
+.ms-date-grid-item.is-current {
+  border-color: var(--ms-blue-accent);
+  font-weight: 600;
+}
+
+.ms-date-nav-btn {
+  border: none;
+  background: transparent;
+  font-size: 1.2em;
+  cursor: pointer;
+  color: var(--ms-text-muted);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.ms-date-nav-btn:hover {
+  background: var(--ms-bg-hover);
+  color: var(--text-normal);
+}
+
+.ms-date-days-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  text-align: center;
+}
+
+.ms-date-day-header {
+  font-size: 0.75em;
+  color: var(--ms-text-muted);
+  font-weight: 500;
+  padding: 4px 0;
+}
+
+.ms-date-day-cell {
+  padding: 5px 0;
+  font-size: 0.85em;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-normal);
+}
+
+.ms-date-day-cell:hover {
+  background: var(--ms-bg-hover);
+}
+
+.ms-date-day-cell.is-other-month {
+  opacity: 0.3;
+}
+
+.ms-date-day-cell.is-today {
+  font-weight: 700;
+  color: var(--ms-blue-accent);
+}
+
+.ms-date-day-cell.is-selected {
+  background-color: var(--ms-blue-accent) !important;
+  color: #ffffff !important;
+  font-weight: 600;
+}
+
+/* --- Tag Modal --- */
+.ms-tag-modal-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ms-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ms-border);
+}
+
+.ms-modal-footer button {
+  margin: 0 !important;
+}
+
+.ms-selected-tags-area {
+  min-height: 36px;
+  padding: 6px;
+  border: 1px solid var(--ms-border);
+  border-radius: 6px;
+  background: var(--ms-bg-subtle);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.ms-search-input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--ms-border);
+  border-radius: 4px;
+}
+
+.ms-tag-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.ms-tag-item-row:hover {
+  background-color: var(--ms-bg-hover);
+}
+
+.ms-color-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ms-color-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+}
+
+.ms-color-dot.is-active {
+  border-color: var(--ms-blue-accent) !important;
+}
+
+/* --- Single Select Popover --- */
+.ms-select-popover {
+  min-width: 220px;
+  max-width: 320px;
+  padding: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  background: var(--background-primary);
+}
+
+.ms-popover-search-wrap {
+  padding: 4px 6px 8px 6px;
+  border-bottom: 1px solid var(--ms-border);
+}
+
+.ms-popover-search-input {
+  width: 100%;
+  padding: 5px 8px;
+  font-size: 0.85em;
+  border: 1px solid var(--ms-border);
+  border-radius: 4px;
+  background: var(--ms-bg-subtle);
+  color: var(--text-normal);
+  outline: none;
+}
+
+.ms-popover-search-input:focus {
+  border-color: var(--ms-blue-accent);
+}
+
+.ms-popover-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding-top: 4px;
+}
+
+.ms-select-option-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.ms-select-option-item:hover,
+.ms-select-option-item.is-keyboard-active,
+.ms-create-option-item.is-keyboard-active {
+  background-color: var(--ms-bg-hover);
+}
+
+.ms-select-option-item.is-selected {
+  background-color: rgba(35, 131, 226, 0.08);
+}
+
+.ms-create-option-item {
+  display: flex;
+  align-items: center;
+  padding: 5px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--ms-blue-accent);
+  font-weight: 500;
+}
+
+/* --- Add Column Modal Type Picker --- */
+.ms-modal-add-column {
+  padding: 4px 8px;
+}
+
+.ms-modal-name-section {
+  margin: 6px 0 16px 0;
+}
+
+.ms-modal-name-input-wrap {
+  width: 100%;
+}
+
+.ms-modal-name-input-wrap input.ms-modal-name-input,
+input[type="text"].ms-modal-name-input {
+  width: 100% !important;
+  box-sizing: border-box;
+  padding: 8px 12px !important;
+  font-size: 0.95em;
+  height: 38px;
+  border: 1px solid var(--ms-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  outline: none;
+}
+
+.ms-modal-name-input-wrap input.ms-modal-name-input:focus,
+input[type="text"].ms-modal-name-input:focus {
+  border-color: var(--ms-blue-accent);
+  box-shadow: 0 0 0 1px var(--ms-blue-accent);
+}
+
+.ms-modal-type-section {
+  margin: 16px 0 12px 0;
+}
+
+.ms-modal-section-header {
+  margin-bottom: 10px;
+}
+
+.ms-modal-section-title {
+  font-size: 0.95em;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.ms-modal-section-desc {
+  font-size: 0.8em;
+  color: var(--ms-text-muted);
+  margin-top: 2px;
+}
+
+.ms-add-col-types-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  box-sizing: border-box;
+}
+
+.ms-add-col-type-card {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 30px 8px 12px;
+  height: 54px;
+  min-height: 54px;
+  max-height: 54px;
+  border: 1px solid var(--ms-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  user-select: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.ms-add-col-type-card:hover {
+  border-color: var(--ms-blue-accent);
+  background: var(--ms-bg-hover);
+}
+
+.ms-add-col-type-card.is-selected {
+  border-color: var(--ms-blue-accent);
+  background: var(--ms-focus-col-bg, rgba(35, 131, 226, 0.08));
+  box-shadow: 0 0 0 1px var(--ms-blue-accent);
+}
+
+.ms-type-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 6px;
+  background: var(--ms-bg-hover);
+  color: var(--text-normal);
+  flex-shrink: 0;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.ms-add-col-type-card.is-selected .ms-type-card-icon {
+  background: var(--ms-blue-accent);
+  color: #ffffff;
+}
+
+.ms-type-card-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.ms-type-card-label {
+  font-size: 0.88em;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ms-type-card-desc {
+  font-size: 0.74em;
+  line-height: 1.25;
+  color: var(--ms-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+.ms-type-card-check {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--ms-blue-accent);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.15s ease, visibility 0.15s ease;
+}
+
+.ms-add-col-type-card.is-selected .ms-type-card-check {
+  opacity: 1;
+  visibility: visible;
+}
+
