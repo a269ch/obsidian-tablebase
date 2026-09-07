@@ -1,4 +1,4 @@
-export type TagColor =
+export type PresetTagColor =
   | "default"
   | "gray"
   | "brown"
@@ -9,6 +9,8 @@ export type TagColor =
   | "purple"
   | "pink"
   | "red";
+
+export type TagColor = PresetTagColor | (string & {});
 
 export interface MultiSelectTag {
   id: string;
@@ -40,11 +42,14 @@ export type CalculationType =
   | "count_checked"
   | "count_unchecked";
 
+export type ColumnAlignment = "left" | "center" | "right";
+
 export interface TableColumn {
   name: string;
   index: number;
   type: ColumnType;
-  width?: number; // In pixels
+  align?: ColumnAlignment;
+  width?: number;
   calculation?: CalculationType;
   uniqueTags?: MultiSelectTag[];
   dateFormat?: DateFormatOption;
@@ -108,6 +113,7 @@ export interface FilterRule {
   operator: FilterOperator;
   value: string | string[];
   enabled: boolean;
+  conjunction?: Conjunction;
 }
 
 export type Conjunction = "AND" | "OR";
@@ -146,19 +152,13 @@ export interface PluginSettings {
   autoDetectMultiSelect: boolean;
   multiSelectColumnNames: string[];
   customTagColors: Record<string, TagColor>;
-  enableLiveFiltering: boolean;
-  persistFiltersInMarkdown: boolean;
-  showFilterButtonOnHoverOnly: boolean;
   enableCalculations: boolean;
-  enableKeyboardNavigation: boolean;
-  colorPaletteTheme: "palette" | "pastel" | "vibrant";
   stickyFirstColumn: boolean;
   showRowNumbers: boolean;
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
   defaultTagFormat: "comma",
-  dateFormat: "YYYY-MM-DD",
   autoDetectMultiSelect: true,
   multiSelectColumnNames: [
     "Tags",
@@ -169,21 +169,9 @@ export const DEFAULT_SETTINGS: PluginSettings = {
     "Category",
     "Status",
     "Keywords",
-    "Теги",
-    "Тег",
-    "Метки",
-    "Метка",
-    "Категории",
-    "Категория",
-    "Статус",
   ],
   customTagColors: {},
-  enableLiveFiltering: true,
-  persistFiltersInMarkdown: false,
-  showFilterButtonOnHoverOnly: false,
   enableCalculations: true,
-  enableKeyboardNavigation: true,
-  colorPaletteTheme: "palette",
   stickyFirstColumn: true,
   showRowNumbers: false,
 };

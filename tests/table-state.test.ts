@@ -31,10 +31,10 @@ describe("Table State Manager", () => {
     expect(columns.length).toBe(6);
     expect(columns[0].type).toBe("text");
     expect(columns[1].type).toBe("multi-select");
-    expect(columns[2].type).toBe("select"); // Inferred as single-select for Status keyword
-    expect(columns[3].type).toBe("checkbox"); // Auto-detected [x] / [ ]
-    expect(columns[4].type).toBe("number"); // Auto-detected 12.5 / 5
-    expect(columns[5].type).toBe("date"); // Auto-detected 2026-09-01
+    expect(columns[2].type).toBe("select");
+    expect(columns[3].type).toBe("checkbox");
+    expect(columns[4].type).toBe("number");
+    expect(columns[5].type).toBe("date");
     expect(columns[5].dateFormat).toBe("YYYY-MM-DD");
   });
 
@@ -157,23 +157,64 @@ describe("Table State Manager", () => {
     expect(manager.deserializeFromComment("<!-- ms-filter: { invalid json } -->", "tbl")).toBeNull();
   });
 
-  it("should infer Russian keywords for select and multi-select", () => {
+  it("should infer keywords for select and multi-select", () => {
     const manager = new TableStateManager();
     const table: MarkdownTableData = {
-      id: "tbl_ru",
-      headers: ["Статус", "Теги", "Приоритет"],
+      id: "tbl_keywords",
+      headers: ["Status", "Tags", "Priority"],
       alignments: ["---", "---", "---"],
-      rows: [{ rowIndex: 0, rawLine: "", cells: ["В работе", "UI, Баг", "Высокий"] }],
+      rows: [{ rowIndex: 0, rawLine: "", cells: ["In Progress", "UI, Bug", "High"] }],
       startLine: 0,
       endLine: 1,
       rawMarkdown: "",
     };
     const columns = manager.analyzeColumns(table, {
       ...DEFAULT_SETTINGS,
-      multiSelectColumnNames: ["теги"],
+      multiSelectColumnNames: ["tags"],
     });
     expect(columns[0].type).toBe("select");
     expect(columns[1].type).toBe("multi-select");
     expect(columns[2].type).toBe("select");
+  });
+
+  it("should infer column alignments from table alignments row", () => {
+    const manager = new TableStateManager();
+    const table: MarkdownTableData = {
+      id: "tbl_align",
+      headers: ["LeftCol", "CenterCol", "RightCol", "DefaultCol"],
+      alignments: [":---", ":---:", "---:", "---"],
+      rows: [{ rowIndex: 0, rawLine: "", cells: ["a", "b", "c", "d"] }],
+      startLine: 0,
+      endLine: 1,
+      rawMarkdown: "",
+    };
+    const columns = manager.analyzeColumns(table, DEFAULT_SETTINGS);
+    expect(columns[0].align).toBe("left");
+    expect(columns[1].align).toBe("center");
+    expect(columns[2].align).toBe("right");
+    expect(columns[3].align).toBe("left");
+  });
+
+  it("should default numbers to right alignment and checkboxes to center", () => {
+    const manager = new TableStateManager();
+    const table: MarkdownTableData = {
+      id: "tbl_defaults",
+      headers: ["Amount", "Done", "Task"],
+      alignments: ["---", "---", "---"],
+      rows: [
+        { rowIndex: 0, rawLine: "", cells: ["100", "[x]", "Work"] },
+        { rowIndex: 1, rawLine: "", cells: ["250", "[ ]", "Review"] },
+      ],
+      startLine: 0,
+      endLine: 2,
+      rawMarkdown: "",
+    };
+    const columns = manager.analyzeColumns(table, DEFAULT_SETTINGS);
+    expect(columns[0].type).toBe("number");
+    expect(columns[0].align).toBe("right");
+    expect(columns[1].type).toBe("checkbox");
+    expect(columns[1].align).toBe("center");
+    expect(columns[2].type).toBe("text");
+    expect(columns[2].align).toBe("left");
   });
 });

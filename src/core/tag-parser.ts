@@ -1,14 +1,6 @@
 import { TagColor, MultiSelectTag, TagFormat } from "../types";
 import { resolveTagColor } from "./color-palette";
 
-/**
- * Parses a string cell value into an array of MultiSelectTag objects.
- * Supports:
- * - Comma-separated: "Frontend, UI, Bug"
- * - Semicolon-separated: "Frontend; UI; Bug"
- * - Hashtags: "#Frontend #UI #Bug"
- * - Wikilinks: "[[Frontend]], [[UI]]"
- */
 export function parseCellTags(
   cellContent: string,
   customColors?: Record<string, TagColor>
@@ -24,8 +16,8 @@ export function parseCellTags(
 
   const rawTags: string[] = [];
 
-  // Check if wikilinks format: [[tag1]], [[tag2]]
   if (trimmed.includes("[[") && trimmed.includes("]]")) {
+    // [[Target]] or [[Target|Alias]] -> group 1 captures the target, alias discarded
     const wikilinkRegex = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g;
     let match: RegExpExecArray | null;
     while ((match = wikilinkRegex.exec(trimmed)) !== null) {
@@ -35,8 +27,9 @@ export function parseCellTags(
     }
   }
 
-  // If no wikilinks found, check if it's hashtag format: #tag1 #tag2
+  // Detects a mid-string hashtag (space followed by # and a Latin/Cyrillic word character)
   if (rawTags.length === 0 && (trimmed.startsWith("#") || /\s#[a-zA-Z0-9_\-\u0400-\u04FF]/.test(trimmed))) {
+    // Unicode-aware hashtag body: any letter or number, plus underscore and dash
     const hashtagRegex = /#([\p{L}\p{N}_-]+)/gu;
     let match: RegExpExecArray | null;
     while ((match = hashtagRegex.exec(trimmed)) !== null) {
@@ -46,8 +39,8 @@ export function parseCellTags(
     }
   }
 
-  // If still no tags extracted, fallback to comma/semicolon separation
   if (rawTags.length === 0) {
+    // Matches comma or semicolon tag delimiters
     const parts = trimmed.split(/[,;]/);
     for (const part of parts) {
       const clean = part.trim();
@@ -57,7 +50,6 @@ export function parseCellTags(
     }
   }
 
-  // Deduplicate while preserving order and casing
   const seen = new Set<string>();
   const uniqueTags: MultiSelectTag[] = [];
 
@@ -77,9 +69,6 @@ export function parseCellTags(
   return uniqueTags;
 }
 
-/**
- * Formats an array of MultiSelectTags or tag names into cell string representation.
- */
 export function formatTagsToCell(
   tags: (MultiSelectTag | string)[],
   format: TagFormat = "comma"
@@ -100,6 +89,7 @@ export function formatTagsToCell(
     case "wikilink":
       return names.map((name) => `[[${name}]]`).join(", ");
     case "hashtag":
+      // Replaces whitespace sequences with underscores for valid hashtag identifiers
       return names
         .map((name) => `#${name.replace(/\s+/g, "_")}`)
         .join(" ");
@@ -109,9 +99,6 @@ export function formatTagsToCell(
   }
 }
 
-/**
- * Checks if a string contains multiple tags or matches common tag patterns.
- */
 export function looksLikeMultiSelect(
   values: string[],
   columnHeaderName?: string
@@ -119,9 +106,8 @@ export function looksLikeMultiSelect(
   if (columnHeaderName) {
     const headerLower = columnHeaderName.toLowerCase();
     const commonNames = [
-      "tag", "tags", "label", "labels", "category", "categories", 
-      "status", "topic", "topics", "тег", "теги", "метка", "метки", 
-      "категория", "категории", "статус"
+      "tag", "tags", "label", "labels", "category", "categories",
+      "status", "topic", "topics"
     ];
     if (commonNames.some((name) => headerLower.includes(name))) {
       return true;

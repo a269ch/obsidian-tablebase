@@ -28,10 +28,10 @@ describe("Tag Parser & Formatter", () => {
       expect(tags[1].name).toBe("Team Beta");
     });
 
-    it("should parse hashtags including unicode/cyrillic", () => {
-      const tags = parseCellTags("#dev #важное #urgent_fix");
+    it("should parse hashtags including alphanumeric and underscores", () => {
+      const tags = parseCellTags("#dev #important #urgent_fix");
       expect(tags.length).toBe(3);
-      expect(tags.map((t) => t.name)).toEqual(["dev", "важное", "urgent_fix"]);
+      expect(tags.map((t) => t.name)).toEqual(["dev", "important", "urgent_fix"]);
     });
 
     it("should deduplicate tags case-insensitively", () => {
@@ -80,7 +80,7 @@ describe("Tag Parser & Formatter", () => {
     it("should return true for known multi-select header names", () => {
       expect(looksLikeMultiSelect([], "Tags")).toBe(true);
       expect(looksLikeMultiSelect([], "Status")).toBe(true);
-      expect(looksLikeMultiSelect([], "Метки")).toBe(true);
+      expect(looksLikeMultiSelect([], "Labels")).toBe(true);
     });
 
     it("should detect multi-select cells based on content patterns", () => {

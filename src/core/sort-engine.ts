@@ -1,113 +1,146 @@
-import { MarkdownTableRow, SortDirection, TableColumn } from "../types";
+import { MarkdownTableRow, SortDirection, SortRule, TableColumn } from "../types";
 import { parseCellTags } from "./tag-parser";
 import { compareDateStrings } from "./date-utils";
 
-/**
- * Checks if a cell string represents a checked checkbox.
- */
+const CHECKED_VALUES = new Set<string>([
+  "[x]",
+  "x",
+  "true",
+  "yes",
+  "1",
+  "✓",
+  "✔",
+]);
+
+// Currency symbols and percent signs stripped before numeric parsing
+const CURRENCY_AND_PERCENT = /[$€£¥₽%]/g;
+// Matches whitespace characters
+const WHITESPACE = /\s+/g;
+// Everything except digits, decimal point and minus sign
+const NON_NUMERIC = /[^\d.-]/g;
+
 export function isCellChecked(cell: string): boolean {
-  const norm = (cell || "").trim().toLowerCase();
-  return (
-    norm === "[x]" ||
-    norm === "x" ||
-    norm === "true" ||
-    norm === "yes" ||
-    norm === "1" ||
-    norm === "✓" ||
-    norm === "✔"
-  );
+  return CHECKED_VALUES.has((cell || "").trim().toLowerCase());
 }
 
-/**
- * Extracts a numeric value from string (e.g. "$1,200.50", "12,5 €", "45%", "3 500", "-50").
- */
 export function parseCellNumber(cell: string): number {
   if (!cell) return NaN;
-  let s = cell.trim();
-  // Remove currency symbols, percent, and spaces
-  s = s.replace(/[$€£¥₽%]/g, "").replace(/\s+/g, "");
+  let s = cell.trim().replace(CURRENCY_AND_PERCENT, "").replace(WHITESPACE, "");
 
-  // Handle European comma decimal vs US comma thousands
   if (s.includes(",") && !s.includes(".")) {
     s = s.replace(",", ".");
   } else if (s.includes(",") && s.includes(".")) {
     if (s.indexOf(",") < s.indexOf(".")) {
-      // US format "1,200.50"
       s = s.replace(/,/g, "");
     } else {
-      // EU format "1.200,50"
       s = s.replace(/\./g, "").replace(",", ".");
     }
   }
 
-  const clean = s.replace(/[^\d.-]/g, "");
-  return parseFloat(clean);
+  return parseFloat(s.replace(NON_NUMERIC, ""));
 }
 
-/**
- * Sorts table rows according to a specific column and direction.
- */
+function isEmptyCell(value: string): boolean {
+  const trimmed = value.trim();
+  return trimmed === "" || trimmed === "-";
+}
+
+function compareByType(
+  valA: string,
+  valB: string,
+  columnType: TableColumn["type"]
+): number {
+  switch (columnType) {
+    case "number": {
+      const numA = parseCellNumber(valA);
+      const numB = parseCellNumber(valB);
+      if (isNaN(numA) && isNaN(numB)) return 0;
+      if (isNaN(numA)) return 1;
+      if (isNaN(numB)) return -1;
+      return numA - numB;
+    }
+
+    case "checkbox": {
+      return (isCellChecked(valA) ? 1 : 0) - (isCellChecked(valB) ? 1 : 0);
+    }
+
+    case "multi-select": {
+      const tagsA = parseCellTags(valA);
+      const tagsB = parseCellTags(valB);
+      const nameA = tagsA.length > 0 ? tagsA[0].name.toLowerCase() : "";
+      const nameB = tagsB.length > 0 ? tagsB[0].name.toLowerCase() : "";
+      return nameA.localeCompare(nameB);
+    }
+
+    case "date": {
+      return compareDateStrings(valA, valB);
+    }
+
+    case "text":
+    case "select":
+    default: {
+      return valA.localeCompare(valB, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
+    }
+  }
+}
+
+export function compareRowsByColumn(
+  a: MarkdownTableRow,
+  b: MarkdownTableRow,
+  columnIndex: number,
+  direction: SortDirection,
+  columnType: TableColumn["type"] = "text"
+): number {
+  const valA = a.cells[columnIndex] || "";
+  const valB = b.cells[columnIndex] || "";
+
+  const isEmptyA = isEmptyCell(valA);
+  const isEmptyB = isEmptyCell(valB);
+  if (isEmptyA && isEmptyB) return 0;
+  if (isEmptyA) return 1;
+  if (isEmptyB) return -1;
+
+  const factor = direction === "asc" ? 1 : -1;
+  return compareByType(valA, valB, columnType) * factor;
+}
+
 export function sortRows(
   rows: MarkdownTableRow[],
   columnIndex: number,
   direction: SortDirection,
   columnType: TableColumn["type"] = "text"
 ): MarkdownTableRow[] {
-  const sorted = [...rows];
-  const factor = direction === "asc" ? 1 : -1;
+  return [...rows].sort((a, b) =>
+    compareRowsByColumn(a, b, columnIndex, direction, columnType)
+  );
+}
 
-  sorted.sort((a, b) => {
-    const valA = a.cells[columnIndex] || "";
-    const valB = b.cells[columnIndex] || "";
+export function sortRowsByRules(
+  rows: MarkdownTableRow[],
+  sortRules: SortRule[],
+  columns: TableColumn[]
+): MarkdownTableRow[] {
+  if (!sortRules || sortRules.length === 0) {
+    return rows;
+  }
 
-    // Empty values always go to the bottom in ascending, top in descending
-    const isEmptyA = !valA.trim() || valA.trim() === "-";
-    const isEmptyB = !valB.trim() || valB.trim() === "-";
-
-    if (isEmptyA && isEmptyB) return 0;
-    if (isEmptyA) return 1;
-    if (isEmptyB) return -1;
-
-    switch (columnType) {
-      case "number": {
-        const numA = parseCellNumber(valA);
-        const numB = parseCellNumber(valB);
-        if (isNaN(numA) && isNaN(numB)) return 0;
-        if (isNaN(numA)) return 1;
-        if (isNaN(numB)) return -1;
-        return (numA - numB) * factor;
-      }
-
-      case "checkbox": {
-        const checkA = isCellChecked(valA) ? 1 : 0;
-        const checkB = isCellChecked(valB) ? 1 : 0;
-        return (checkA - checkB) * factor;
-      }
-
-      case "multi-select": {
-        const tagsA = parseCellTags(valA);
-        const tagsB = parseCellTags(valB);
-        const nameA = tagsA.length > 0 ? tagsA[0].name.toLowerCase() : "";
-        const nameB = tagsB.length > 0 ? tagsB[0].name.toLowerCase() : "";
-        return nameA.localeCompare(nameB) * factor;
-      }
-
-      case "date": {
-        return compareDateStrings(valA, valB) * factor;
-      }
-
-      case "text":
-      case "select":
-      default: {
-        return (
-          valA.localeCompare(valB, undefined, {
-            numeric: true,
-            sensitivity: "base",
-          }) * factor
-        );
+  return [...rows].sort((a, b) => {
+    for (const rule of sortRules) {
+      const column = columns[rule.columnIndex];
+      const result = compareRowsByColumn(
+        a,
+        b,
+        rule.columnIndex,
+        rule.direction,
+        column ? column.type : "text"
+      );
+      if (result !== 0) {
+        return result;
       }
     }
+    return 0;
   });
-
-  return sorted;
 }

@@ -1,20 +1,19 @@
 import { App } from "obsidian";
+import { resolveTagColor } from "../core/color-palette";
+import { formatDateByOption, parseAnyDate } from "../core/date-utils";
 import { evaluateFilterStateOnRow } from "../core/filter-engine";
-import { parseCellTags } from "../core/tag-parser";
 import { isCellChecked } from "../core/sort-engine";
+import { parseCellTags } from "../core/tag-parser";
 import {
+  DatabaseViewType,
   MarkdownTableData,
   MarkdownTableRow,
   PluginSettings,
   TableColumn,
   TableFilterState,
 } from "../types";
-import { createTagBadge } from "./tag-badge";
-import { mountFloatingPopover } from "./popover-utils";
-import { attachStrictNumericInputHandlers, sanitizeNumericCellValue } from "./input-utils";
-import { DatePickerPopover } from "./date-picker-modal";
-import { SingleSelectPopover } from "./single-select-popover";
-import { TagSelectModal } from "./tag-select-modal";
+import { appendIcon, appendIconLabel } from "../utils/dom";
+import { attachStrictNumericInputHandlers, sanitizeNumericCellValue } from "../utils/input";
 import {
   ICON_CHECK_SQUARE,
   ICON_DUPLICATE,
@@ -27,6 +26,12 @@ import {
   ICON_VIEW_BOARD,
   ICON_VIEW_TABLE,
 } from "./icons";
+import { DatePickerPopover } from "./modals/date-picker-popover";
+import { SingleSelectPopover } from "./modals/single-select-popover";
+import { TagSelectModal } from "./modals/tag-select-modal";
+import { mountFloatingPopover } from "./popover";
+import { createTagBadge } from "./tag-badge";
+import { BoardViewActions } from "./table/types";
 
 export interface KanbanViewOptions {
   app: App;
@@ -34,32 +39,39 @@ export interface KanbanViewOptions {
   columns: TableColumn[];
   filterState: TableFilterState;
   settings: PluginSettings;
-  onCellUpdate: (rowIndex: number, colIndex: number, newValue: string) => Promise<void>;
-  onAddRow: (atIndex?: number, prefilledCells?: string[]) => Promise<void>;
-  onDeleteRow: (rowIndex: number) => Promise<void>;
-  onReorderRows?: (fromIndex: number, toIndex: number) => Promise<void>;
-  onSwitchView: (view: "table" | "board") => void;
+  actions: BoardViewActions;
+  onSwitchView: (view: DatabaseViewType) => void;
 }
+
+const NO_STATUS_KEY = "__NO_STATUS__";
+const CHECKED_GROUP = "[x]";
+const UNCHECKED_GROUP = "[ ]";
 
 export class KanbanView {
   private options: KanbanViewOptions;
   private containerEl: HTMLElement;
-  private groupByColIndex: number = 1;
+  private groupByColIndex: number;
 
   constructor(options: KanbanViewOptions) {
     this.options = options;
-    this.containerEl = document.createElement("div");
-    this.containerEl.className = "ms-kanban-container";
+    this.containerEl = createDiv({ cls: "ms-kanban-container" });
+    this.groupByColIndex = this.resolveInitialGroupByColumn();
+  }
 
-    // Auto-detect group-by column (prefer select/multi-select column, fallback to col 1)
-    const selectColIdx = options.columns.findIndex(
-      (c) => c.type === "select" || c.type === "multi-select"
-    );
-    if (selectColIdx !== -1) {
-      this.groupByColIndex = selectColIdx;
-    } else if (options.columns.length > 1) {
-      this.groupByColIndex = 1;
+  private resolveInitialGroupByColumn(): number {
+    const { filterState, columns } = this.options;
+    const saved = filterState?.groupByColumnIndex;
+
+    if (typeof saved === "number" && saved < columns.length) {
+      return saved;
     }
+
+    const selectColumnIdx = columns.findIndex(
+      (col) => col.type === "select" || col.type === "multi-select"
+    );
+    if (selectColumnIdx !== -1) return selectColumnIdx;
+
+    return columns.length > 1 ? 1 : 0;
   }
 
   public getElement(): HTMLElement {
@@ -69,388 +81,514 @@ export class KanbanView {
 
   public render(): void {
     this.containerEl.empty();
+    this.renderToolbar();
 
-    const { tableData, columns, filterState, settings } = this.options;
-    const groupByCol = columns[this.groupByColIndex] || columns[0];
+    const groupByCol = this.options.columns[this.groupByColIndex] ?? this.options.columns[0];
+    const isCheckboxGroup = groupByCol?.type === "checkbox";
+    const groups = this.groupRows(groupByCol);
+    const boardWrapper = this.containerEl.createDiv({ cls: "ms-kanban-board-wrapper" });
 
-    // 1. Kanban Header Toolbar
+    groups.forEach((rows, groupName) => {
+      this.renderColumn(boardWrapper, groupName, rows, groupByCol, isCheckboxGroup);
+    });
+  }
+
+  private renderToolbar(): void {
     const topbar = this.containerEl.createDiv({ cls: "ms-db-top-bar" });
-
-    // Left Header: View Switcher & Group By
     const leftHeader = topbar.createDiv({ cls: "ms-db-header-left" });
 
-    const tableBtn = leftHeader.createEl("button", {
-      cls: "ms-db-view-tab-btn",
-    });
-    tableBtn.innerHTML = `${ICON_VIEW_TABLE}<span>Table</span>`;
+    const tableBtn = leftHeader.createEl("button", { cls: "ms-db-view-tab-btn" });
+    appendIconLabel(tableBtn, ICON_VIEW_TABLE, "Table");
     tableBtn.addEventListener("click", () => this.options.onSwitchView("table"));
 
     const boardBtn = leftHeader.createEl("button", {
       cls: "ms-db-view-tab-btn is-active",
     });
-    boardBtn.innerHTML = `${ICON_VIEW_BOARD}<span>Board</span>`;
+    appendIconLabel(boardBtn, ICON_VIEW_BOARD, "Board");
     boardBtn.addEventListener("click", () => this.options.onSwitchView("board"));
 
     leftHeader.createDiv({ cls: "ms-topbar-divider" });
 
-    // Group By Selector
-    const groupByGroup = leftHeader.createDiv({ cls: "ms-group-by-wrapper" });
-    groupByGroup.createSpan({ text: "Group by:" });
-    const groupSelect = groupByGroup.createEl("select", { cls: "ms-group-select" });
+    const groupByWrapper = leftHeader.createDiv({ cls: "ms-group-by-wrapper" });
+    groupByWrapper.createSpan({ text: "Group by:" });
+    const groupSelect = groupByWrapper.createEl("select", { cls: "ms-group-select" });
 
-    columns.forEach((col) => {
-      const opt = groupSelect.createEl("option", {
+    for (const col of this.options.columns) {
+      if (col.index === 0) continue;
+      const option = groupSelect.createEl("option", {
         value: `${col.index}`,
         text: col.name,
       });
-      if (col.index === this.groupByColIndex) {
-        opt.selected = true;
-      }
-    });
+      option.selected = col.index === this.groupByColIndex;
+    }
 
     groupSelect.addEventListener("change", (e) => {
       this.groupByColIndex = parseInt((e.target as HTMLSelectElement).value, 10);
+      if (this.options.filterState) {
+        this.options.filterState.groupByColumnIndex = this.groupByColIndex;
+      }
       this.render();
     });
+  }
 
-    // 2. Filter Rows
-    let visibleRows = tableData.rows;
-    if (filterState) {
-      visibleRows = tableData.rows.filter((r) =>
-        evaluateFilterStateOnRow(r, filterState, columns)
-      );
-    }
+  private getVisibleRows(): MarkdownTableRow[] {
+    const { tableData, filterState, columns } = this.options;
+    if (!filterState) return tableData.rows;
+    return tableData.rows.filter((row) =>
+      evaluateFilterStateOnRow(row, filterState, columns)
+    );
+  }
 
-    // 3. Group rows into Kanban columns
-    const groupMap = new Map<string, MarkdownTableRow[]>();
+  private groupRows(groupByCol: TableColumn | undefined): Map<string, MarkdownTableRow[]> {
+    const visibleRows = this.getVisibleRows();
+    const groups = new Map<string, MarkdownTableRow[]>();
 
-    // Initialize groups from unique tags if select/multi-select
-    if (groupByCol && groupByCol.uniqueTags && groupByCol.uniqueTags.length > 0) {
-      groupByCol.uniqueTags.forEach((t) => groupMap.set(t.name, []));
-    }
+    if (groupByCol?.type === "checkbox") {
+      groups.set(UNCHECKED_GROUP, []);
+      groups.set(CHECKED_GROUP, []);
 
-    // Also populate "No Status" / "No [Group]"
-    const noStatusLabel = `No ${groupByCol ? groupByCol.name : "Status"}`;
-    groupMap.set(noStatusLabel, []);
-
-    visibleRows.forEach((row) => {
-      const cellVal = (row.cells[this.groupByColIndex] || "").trim();
-      if (!cellVal) {
-        groupMap.get(noStatusLabel)!.push(row);
-      } else {
-        const tags = parseCellTags(cellVal, settings.customTagColors);
-        if (tags.length === 0) {
-          const rawTag = cellVal.replace(/^\[\[|\]\]$/g, "").trim();
-          if (!groupMap.has(rawTag)) groupMap.set(rawTag, []);
-          groupMap.get(rawTag)!.push(row);
-        } else {
-          const firstTagName = tags[0].name;
-          if (!groupMap.has(firstTagName)) groupMap.set(firstTagName, []);
-          groupMap.get(firstTagName)!.push(row);
-        }
+      for (const row of visibleRows) {
+        const cellValue = (row.cells[this.groupByColIndex] || "").trim();
+        const key = isCellChecked(cellValue) ? CHECKED_GROUP : UNCHECKED_GROUP;
+        groups.get(key)?.push(row);
       }
+      return groups;
+    }
+
+    const noStatusRows: MarkdownTableRow[] = [];
+    const tagGroups = new Map<string, MarkdownTableRow[]>();
+
+    for (const tag of groupByCol?.uniqueTags ?? []) {
+      tagGroups.set(tag.name, []);
+    }
+
+    for (const row of visibleRows) {
+      const cellValue = (row.cells[this.groupByColIndex] || "").trim();
+      if (!cellValue) {
+        noStatusRows.push(row);
+        continue;
+      }
+
+      const tags = parseCellTags(cellValue, this.options.settings.customTagColors);
+      // Strips surrounding wikilink brackets when the cell yields no parseable tags
+      const key =
+        tags.length > 0 ? tags[0].name : cellValue.replace(/^\[\[|\]\]$/g, "").trim();
+
+      if (!tagGroups.has(key)) {
+        tagGroups.set(key, []);
+      }
+      tagGroups.get(key)?.push(row);
+    }
+
+    if (noStatusRows.length > 0 || tagGroups.size === 0) {
+      groups.set(NO_STATUS_KEY, noStatusRows);
+    }
+    tagGroups.forEach((rows, name) => groups.set(name, rows));
+
+    return groups;
+  }
+
+  private renderColumn(
+    boardWrapper: HTMLElement,
+    groupName: string,
+    rows: MarkdownTableRow[],
+    groupByCol: TableColumn | undefined,
+    isCheckboxGroup: boolean
+  ): void {
+    const isNoStatus = groupName === NO_STATUS_KEY;
+    const colEl = boardWrapper.createDiv({ cls: "ms-kanban-column" });
+    colEl.dataset.groupName = groupName;
+
+    const colHeader = colEl.createDiv({ cls: "ms-kanban-column-header" });
+    const colTitle = colHeader.createDiv({ cls: "ms-kanban-column-title" });
+
+    if (isCheckboxGroup) {
+      const isDone = groupName === CHECKED_GROUP;
+      const badge = colTitle.createSpan({
+        cls: `ms-kanban-prop-badge is-checkbox ${isDone ? "is-checked" : ""}`,
+      });
+      appendIcon(badge, isDone ? ICON_CHECK_SQUARE : ICON_SQUARE);
+      badge.createSpan({ text: isDone ? "Done" : "Todo" });
+    } else if (!isNoStatus) {
+      colTitle.appendChild(
+        createTagBadge({
+          tag: {
+            id: groupName,
+            name: groupName,
+            color: resolveTagColor(groupName, this.options.settings.customTagColors),
+          },
+          clickable: false,
+        })
+      );
+    } else {
+      colTitle.createSpan({
+        cls: "ms-kanban-no-status-title",
+        text: `No ${groupByCol ? groupByCol.name : "Status"}`,
+      });
+    }
+
+    colTitle.createSpan({ cls: "ms-kanban-count-pill", text: `${rows.length}` });
+
+    const targetValue = isCheckboxGroup ? groupName : isNoStatus ? "" : groupName;
+    const cardsList = colEl.createDiv({ cls: "ms-kanban-cards-list" });
+
+    cardsList.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      cardsList.classList.add("is-drag-over");
     });
 
-    if (groupMap.size === 0) {
-      groupMap.set(noStatusLabel, []);
+    cardsList.addEventListener("dragleave", () => {
+      cardsList.classList.remove("is-drag-over");
+    });
+
+    cardsList.addEventListener("drop", (e) => {
+      e.preventDefault();
+      cardsList.classList.remove("is-drag-over");
+
+      const rowIndex = parseInt(e.dataTransfer?.getData("text/plain") ?? "", 10);
+      if (isNaN(rowIndex)) return;
+
+      void this.options.actions.onCellUpdate(rowIndex, this.groupByColIndex, targetValue).then(() => {
+        this.render();
+      });
+    });
+
+    for (const row of rows) {
+      this.renderCard(cardsList, row, targetValue);
     }
 
-    // 4. Board Columns Container
-    const boardWrapper = this.containerEl.createDiv({ cls: "ms-kanban-board-wrapper" });
-
-    groupMap.forEach((rows, groupName) => {
-      const colEl = boardWrapper.createDiv({ cls: "ms-kanban-column" });
-      colEl.dataset.groupName = groupName;
-
-      // Column Header
-      const colHeader = colEl.createDiv({ cls: "ms-kanban-column-header" });
-      const colTitle = colHeader.createDiv({ cls: "ms-kanban-column-title" });
-
-      const isNoStatus = groupName.startsWith("No ");
-      if (!isNoStatus) {
-        const dummyTag = {
-          id: groupName,
-          name: groupName,
-          color: settings.customTagColors[groupName.toLowerCase()] || "default",
-        };
-        colTitle.appendChild(createTagBadge({ tag: dummyTag, clickable: false }));
-      } else {
-        colTitle.createSpan({ cls: "ms-kanban-no-status-title", text: groupName });
+    const addBtn = colEl.createEl("button", { cls: "ms-kanban-bottom-add-btn" });
+    appendIconLabel(addBtn, ICON_PLUS, "New");
+    addBtn.addEventListener("click", () => {
+      const prefilled = new Array<string>(this.options.columns.length).fill("");
+      if (isCheckboxGroup || !isNoStatus) {
+        prefilled[this.groupByColIndex] = groupName;
       }
+      void this.options.actions.onAddRow(undefined, prefilled);
+    });
+  }
 
-      colTitle.createSpan({ cls: "ms-kanban-count-pill", text: `${rows.length}` });
+  private renderCard(
+    cardsList: HTMLElement,
+    row: MarkdownTableRow,
+    targetValue: string
+  ): void {
+    const card = cardsList.createDiv({ cls: "ms-kanban-card" });
+    card.setAttribute("draggable", "true");
 
-      // Cards List (Drop target)
-      const cardsList = colEl.createDiv({ cls: "ms-kanban-cards-list" });
+    card.addEventListener("dragstart", (e) => {
+      e.dataTransfer?.setData("text/plain", `${row.rowIndex}`);
+      card.classList.add("is-dragging");
+    });
 
-      cardsList.addEventListener("dragover", (e) => {
+    card.addEventListener("dragend", () => {
+      card.classList.remove("is-dragging");
+      this.containerEl
+        .querySelectorAll(".is-card-drop-target")
+        .forEach((el) => el.classList.remove("is-card-drop-target"));
+    });
+
+    card.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      card.classList.add("is-card-drop-target");
+    });
+
+    card.addEventListener("dragleave", (e) => {
+      e.stopPropagation();
+      card.classList.remove("is-card-drop-target");
+    });
+
+    card.addEventListener("drop", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      card.classList.remove("is-card-drop-target");
+
+      const fromIndex = parseInt(e.dataTransfer?.getData("text/plain") ?? "", 10);
+      if (isNaN(fromIndex)) return;
+
+      void (async () => {
+        await this.options.actions.onCellUpdate(fromIndex, this.groupByColIndex, targetValue);
+        if (fromIndex !== row.rowIndex) {
+          await this.options.actions.onReorderRows(fromIndex, row.rowIndex);
+        }
+        this.render();
+      })();
+    });
+
+    const titleEl = card.createDiv({
+      cls: "ms-kanban-card-title",
+      text: row.cells[0] || "Untitled",
+    });
+
+    titleEl.addEventListener("dblclick", (e) => {
+      e.stopPropagation();
+      this.startTitleEdit(titleEl, row);
+    });
+
+    card.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.openCardMenu(card, titleEl, row);
+    });
+
+    this.renderCardProperties(card.createDiv({ cls: "ms-kanban-card-properties" }), row);
+  }
+
+  private startTitleEdit(titleEl: HTMLElement, row: MarkdownTableRow): void {
+    titleEl.empty();
+
+    const input = titleEl.createEl("input", {
+      type: "text",
+      cls: "ms-inline-cell-input",
+      value: row.cells[0] || "",
+    });
+    input.focus();
+    input.select();
+
+    let settled = false;
+    const commit = async (): Promise<void> => {
+      if (settled) return;
+      settled = true;
+      await this.options.actions.onCellUpdate(row.rowIndex, 0, input.value);
+      this.render();
+    };
+
+    input.addEventListener("blur", () => void commit());
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
         e.preventDefault();
-        cardsList.classList.add("is-drag-over");
-      });
+        void commit();
+      } else if (e.key === "Escape") {
+        settled = true;
+        this.render();
+      }
+    });
+  }
 
-      cardsList.addEventListener("dragleave", () => {
-        cardsList.classList.remove("is-drag-over");
-      });
+  private openCardMenu(
+    card: HTMLElement,
+    titleEl: HTMLElement,
+    row: MarkdownTableRow
+  ): void {
+    const menu = createDiv({ cls: "ms-col-header-menu" });
 
-      cardsList.addEventListener("drop", async (e) => {
-        e.preventDefault();
-        cardsList.classList.remove("is-drag-over");
-        const rowIndexStr = e.dataTransfer?.getData("text/plain");
-        if (rowIndexStr !== undefined) {
-          const rowIndex = parseInt(rowIndexStr, 10);
-          const newStatusVal = isNoStatus ? "" : groupName;
-          await this.options.onCellUpdate(rowIndex, this.groupByColIndex, newStatusVal);
+    const editItem = menu.createDiv({ cls: "ms-menu-item" });
+    appendIconLabel(editItem, ICON_EDIT, "Edit title");
+    editItem.addEventListener("click", () => {
+      menu.remove();
+      this.startTitleEdit(titleEl, row);
+    });
+
+    const duplicateItem = menu.createDiv({ cls: "ms-menu-item" });
+    appendIconLabel(duplicateItem, ICON_DUPLICATE, "Duplicate card");
+    duplicateItem.addEventListener("click", () => {
+      void this.options.actions.onAddRow(row.rowIndex + 1, [...row.cells]);
+      menu.remove();
+    });
+
+    const deleteItem = menu.createDiv({ cls: "ms-menu-item is-danger" });
+    appendIconLabel(deleteItem, ICON_TRASH, "Delete card");
+    deleteItem.addEventListener("click", () => {
+      menu.remove();
+      void this.options.actions.onDeleteRow(row.rowIndex);
+    });
+
+    mountFloatingPopover({ anchorEl: card, popoverEl: menu, offsetTop: 2 });
+  }
+
+  private renderCardProperties(propsEl: HTMLElement, row: MarkdownTableRow): void {
+    const { columns, filterState } = this.options;
+
+    columns.forEach((col, colIndex) => {
+      if (colIndex === 0 || colIndex === this.groupByColIndex) return;
+      if (filterState?.hiddenColumnIndices?.includes(colIndex)) return;
+
+      const cellValue = (row.cells[colIndex] || "").trim();
+
+      switch (col.type) {
+        case "multi-select":
+          this.renderMultiSelectProperty(propsEl, row, col, colIndex, cellValue);
+          return;
+        case "select":
+          this.renderSelectProperty(propsEl, row, col, colIndex, cellValue);
+          return;
+        case "date":
+          this.renderDateProperty(propsEl, row, col, colIndex, cellValue);
+          return;
+        case "checkbox":
+          this.renderCheckboxProperty(propsEl, row, col, colIndex, cellValue);
+          return;
+        default:
+          if (cellValue) {
+            this.renderTextProperty(propsEl, row, col, colIndex, cellValue);
+          }
+      }
+    });
+  }
+
+  private renderMultiSelectProperty(
+    propsEl: HTMLElement,
+    row: MarkdownTableRow,
+    col: TableColumn,
+    colIndex: number,
+    cellValue: string
+  ): void {
+    const tags = parseCellTags(cellValue, this.options.settings.customTagColors);
+
+    if (tags.length === 0) {
+      const emptyBadge = propsEl.createSpan({
+        cls: "ms-kanban-prop-badge",
+        text: `+ ${col.name}`,
+      });
+      emptyBadge.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.openMultiSelectModal(row.rowIndex, colIndex, col, cellValue);
+      });
+      return;
+    }
+
+    for (const tag of tags) {
+      propsEl.appendChild(
+        createTagBadge({
+          tag,
+          clickable: true,
+          onClick: (_tag, e) => {
+            e.stopPropagation();
+            this.openMultiSelectModal(row.rowIndex, colIndex, col, cellValue);
+          },
+        })
+      );
+    }
+  }
+
+  private renderSelectProperty(
+    propsEl: HTMLElement,
+    row: MarkdownTableRow,
+    col: TableColumn,
+    colIndex: number,
+    cellValue: string
+  ): void {
+    const parsed = parseCellTags(cellValue, this.options.settings.customTagColors);
+    const tag = parsed[0];
+
+    if (tag) {
+      const badge = createTagBadge({
+        tag,
+        clickable: true,
+        onClick: (_tag, e) => {
+          e.stopPropagation();
+          this.openSingleSelectPopover(badge, row.rowIndex, colIndex, col, cellValue);
+        },
+      });
+      propsEl.appendChild(badge);
+      return;
+    }
+
+    const badge = propsEl.createSpan({ cls: "ms-kanban-prop-badge" });
+    appendIconLabel(badge, ICON_TYPE_SELECT, col.name);
+    badge.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.openSingleSelectPopover(badge, row.rowIndex, colIndex, col, cellValue);
+    });
+  }
+
+  private renderDateProperty(
+    propsEl: HTMLElement,
+    row: MarkdownTableRow,
+    col: TableColumn,
+    colIndex: number,
+    cellValue: string
+  ): void {
+    const badge = propsEl.createSpan({ cls: "ms-kanban-prop-badge is-date" });
+    const targetFormat =
+      col.dateFormat ?? this.options.settings.dateFormat ?? "YYYY-MM-DD";
+    const parsedDate = parseAnyDate(cellValue, targetFormat);
+    const displayText = parsedDate
+      ? formatDateByOption(parsedDate, targetFormat)
+      : cellValue || col.name;
+    appendIconLabel(badge, ICON_TYPE_DATE, displayText);
+    badge.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.openDatePickerPopover(badge, row.rowIndex, colIndex, cellValue);
+    });
+  }
+
+  private renderCheckboxProperty(
+    propsEl: HTMLElement,
+    row: MarkdownTableRow,
+    col: TableColumn,
+    colIndex: number,
+    cellValue: string
+  ): void {
+    const isDone = isCellChecked(cellValue);
+    const badge = propsEl.createSpan({
+      cls: `ms-kanban-prop-badge is-checkbox ${isDone ? "is-checked" : ""}`,
+    });
+    appendIcon(badge, isDone ? ICON_CHECK_SQUARE : ICON_SQUARE);
+    badge.createSpan({ text: col.name });
+
+    badge.addEventListener("click", (e) => {
+      e.stopPropagation();
+      void this.options.actions
+        .onCellUpdate(row.rowIndex, colIndex, isDone ? "[ ]" : "[x]")
+        .then(() => {
+          this.render();
+        });
+    });
+  }
+
+  private renderTextProperty(
+    propsEl: HTMLElement,
+    row: MarkdownTableRow,
+    col: TableColumn,
+    colIndex: number,
+    cellValue: string
+  ): void {
+    const isNumber = col.type === "number";
+    const badge = propsEl.createSpan({
+      cls: "ms-kanban-prop-badge",
+      text: `${isNumber ? "#" : ""} ${cellValue}`,
+    });
+    badge.setAttribute("title", col.name);
+
+    badge.addEventListener("click", (e) => {
+      e.stopPropagation();
+      badge.empty();
+
+      const input = badge.createEl("input", {
+        type: "text",
+        cls: `ms-inline-cell-input ${isNumber ? "is-number" : ""}`,
+        value: cellValue,
+      });
+      input.setAttribute("autocomplete", "off");
+      input.setAttribute("spellcheck", "false");
+
+      if (isNumber) {
+        attachStrictNumericInputHandlers(input);
+      }
+      input.focus();
+      input.select();
+
+      let settled = false;
+      const commit = async (): Promise<void> => {
+        if (settled) return;
+        settled = true;
+        const raw = input.value.trim();
+        const newValue = isNumber ? sanitizeNumericCellValue(raw) : raw;
+        await this.options.actions.onCellUpdate(row.rowIndex, colIndex, newValue);
+        this.render();
+      };
+
+      input.addEventListener("blur", () => void commit());
+      input.addEventListener("keydown", (ke) => {
+        if (ke.key === "Enter") {
+          ke.preventDefault();
+          void commit();
+        } else if (ke.key === "Escape") {
+          settled = true;
           this.render();
         }
-      });
-
-      // Render Cards
-      rows.forEach((row) => {
-        const card = cardsList.createDiv({ cls: "ms-kanban-card" });
-        card.setAttribute("draggable", "true");
-
-        card.addEventListener("dragstart", (e) => {
-          e.dataTransfer?.setData("text/plain", `${row.rowIndex}`);
-          card.classList.add("is-dragging");
-        });
-
-        card.addEventListener("dragend", () => {
-          card.classList.remove("is-dragging");
-          this.containerEl
-            .querySelectorAll(".is-card-drop-target")
-            .forEach((el) => el.classList.remove("is-card-drop-target"));
-        });
-
-        card.addEventListener("dragover", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          card.classList.add("is-card-drop-target");
-        });
-
-        card.addEventListener("dragleave", (e) => {
-          e.stopPropagation();
-          card.classList.remove("is-card-drop-target");
-        });
-
-        card.addEventListener("drop", async (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          card.classList.remove("is-card-drop-target");
-          const fromIdxStr = e.dataTransfer?.getData("text/plain");
-          if (fromIdxStr !== undefined) {
-            const fromIdx = parseInt(fromIdxStr, 10);
-            const toIdx = row.rowIndex;
-            if (!isNaN(fromIdx)) {
-              const newStatusVal = isNoStatus ? "" : groupName;
-              await this.options.onCellUpdate(fromIdx, this.groupByColIndex, newStatusVal);
-              if (fromIdx !== toIdx && this.options.onReorderRows) {
-                await this.options.onReorderRows(fromIdx, toIdx);
-              }
-              this.render();
-            }
-          }
-        });
-
-        // Title Element
-        const titleText = row.cells[0] || "Untitled";
-        const titleEl = card.createDiv({ cls: "ms-kanban-card-title", text: titleText });
-
-        const startTitleEdit = () => {
-          const currentText = row.cells[0] || "";
-          titleEl.empty();
-          const input = titleEl.createEl("input", {
-            type: "text",
-            cls: "ms-inline-cell-input",
-            value: currentText,
-          });
-          input.focus();
-          input.select();
-          const commit = async () => {
-            const newVal = input.value;
-            await this.options.onCellUpdate(row.rowIndex, 0, newVal);
-            this.render();
-          };
-          input.addEventListener("blur", commit);
-          input.addEventListener("keydown", (ke) => {
-            if (ke.key === "Enter") {
-              ke.preventDefault();
-              commit();
-            } else if (ke.key === "Escape") {
-              this.render();
-            }
-          });
-        };
-
-        titleEl.addEventListener("dblclick", (e) => {
-          e.stopPropagation();
-          startTitleEdit();
-        });
-
-        // Context Menu on Card
-        card.addEventListener("contextmenu", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-
-          const menu = document.createElement("div");
-          menu.className = "ms-col-header-menu";
-
-          const editItem = menu.createDiv({ cls: "ms-menu-item" });
-          editItem.innerHTML = `${ICON_EDIT}<span>Edit title</span>`;
-          editItem.addEventListener("click", () => {
-            menu.remove();
-            startTitleEdit();
-          });
-
-          const dupItem = menu.createDiv({ cls: "ms-menu-item" });
-          dupItem.innerHTML = `${ICON_DUPLICATE}<span>Duplicate card</span>`;
-          dupItem.addEventListener("click", () => {
-            const prefilled = [...row.cells];
-            this.options.onAddRow(row.rowIndex + 1, prefilled);
-            menu.remove();
-          });
-
-          const delItem = menu.createDiv({ cls: "ms-menu-item is-danger" });
-          delItem.innerHTML = `${ICON_TRASH}<span>Delete card</span>`;
-          delItem.addEventListener("click", async () => {
-            await this.options.onDeleteRow(row.rowIndex);
-            menu.remove();
-          });
-
-          mountFloatingPopover({
-            anchorEl: card,
-            popoverEl: menu,
-            offsetTop: 2,
-          });
-        });
-
-        // Other Properties Badges (Clickable & Interactive!)
-        const propsEl = card.createDiv({ cls: "ms-kanban-card-properties" });
-
-        columns.forEach((c, cIdx) => {
-          if (cIdx === 0 || cIdx === this.groupByColIndex) return;
-          const cellVal = (row.cells[cIdx] || "").trim();
-
-          if (c.type === "multi-select") {
-            const tags = parseCellTags(cellVal, settings.customTagColors);
-            if (tags.length === 0) {
-              const emptyBadge = propsEl.createSpan({ cls: "ms-kanban-prop-badge", text: `+ ${c.name}` });
-              emptyBadge.addEventListener("click", (e) => {
-                e.stopPropagation();
-                this.openMultiSelectModal(row.rowIndex, cIdx, c, cellVal);
-              });
-            } else {
-              tags.forEach((t) => {
-                const badge = createTagBadge({
-                  tag: t,
-                  clickable: true,
-                  onClick: (_tag, e) => {
-                    e.stopPropagation();
-                    this.openMultiSelectModal(row.rowIndex, cIdx, c, cellVal);
-                  },
-                });
-                propsEl.appendChild(badge);
-              });
-            }
-          } else if (c.type === "select") {
-            const parsed = parseCellTags(cellVal, settings.customTagColors);
-            const tagObj = parsed[0];
-            const badge = tagObj
-              ? createTagBadge({
-                  tag: tagObj,
-                  clickable: true,
-                  onClick: (_tag, e) => {
-                    e.stopPropagation();
-                    this.openSingleSelectPopover(badge, row.rowIndex, cIdx, c, cellVal);
-                  },
-                })
-              : propsEl.createSpan({ cls: "ms-kanban-prop-badge" });
-
-            if (!tagObj) {
-              badge.innerHTML = `${ICON_TYPE_SELECT} <span>${c.name}</span>`;
-              badge.addEventListener("click", (e) => {
-                e.stopPropagation();
-                this.openSingleSelectPopover(badge, row.rowIndex, cIdx, c, cellVal);
-              });
-            }
-            propsEl.appendChild(badge);
-          } else if (c.type === "date") {
-            const dateBadge = propsEl.createSpan({
-              cls: "ms-kanban-prop-badge is-date",
-            });
-            dateBadge.innerHTML = `${ICON_TYPE_DATE} <span>${cellVal || c.name}</span>`;
-            dateBadge.addEventListener("click", (e) => {
-              e.stopPropagation();
-              this.openDatePickerPopover(dateBadge, row.rowIndex, cIdx, cellVal);
-            });
-          } else if (c.type === "checkbox") {
-            const isDone = cellVal === "[x]" || cellVal === "[X]" || isCellChecked(cellVal);
-            const chkBadge = propsEl.createSpan({
-              cls: "ms-kanban-prop-badge is-checkbox",
-            });
-            chkBadge.innerHTML = isDone
-              ? `${ICON_CHECK_SQUARE} <span>Done</span>`
-              : `${ICON_SQUARE} <span>Todo</span>`;
-            chkBadge.addEventListener("click", async (e) => {
-              e.stopPropagation();
-          const newVal = isDone ? "[ ]" : "[x]";
-              await this.options.onCellUpdate(row.rowIndex, cIdx, newVal);
-              this.render();
-            });
-          } else if (cellVal) {
-            // Text or Number
-            const isNum = c.type === "number";
-            const textBadge = propsEl.createEl("span", {
-              cls: "ms-kanban-prop-badge",
-              text: `${isNum ? "#" : ""} ${cellVal}`,
-            });
-            textBadge.addEventListener("click", (e) => {
-              e.stopPropagation();
-              textBadge.empty();
-              const input = textBadge.createEl("input", {
-                type: "text",
-                cls: `ms-inline-cell-input ${isNum ? "is-number" : ""}`,
-                value: cellVal,
-              });
-              input.setAttribute("autocomplete", "off");
-              input.setAttribute("spellcheck", "false");
-              if (isNum) {
-                attachStrictNumericInputHandlers(input);
-              }
-              input.focus();
-              input.select();
-              const saveText = async () => {
-                let newVal = input.value.trim();
-                if (isNum) {
-                  newVal = sanitizeNumericCellValue(newVal);
-                }
-                await this.options.onCellUpdate(row.rowIndex, cIdx, newVal);
-                this.render();
-              };
-              input.addEventListener("blur", saveText);
-              input.addEventListener("keydown", (ke) => {
-                if (ke.key === "Enter") {
-                  ke.preventDefault();
-                  saveText();
-                } else if (ke.key === "Escape") {
-                  this.render();
-                }
-              });
-            });
-          }
-        });
-      });
-
-      // Bottom + New Card Button in column
-      const colBottomAdd = colEl.createEl("button", {
-        cls: "ms-kanban-bottom-add-btn",
-      });
-      colBottomAdd.innerHTML = `${ICON_PLUS}<span>New</span>`;
-      colBottomAdd.addEventListener("click", () => {
-        const prefilled = new Array(columns.length).fill("");
-        if (!isNoStatus) {
-          prefilled[this.groupByColIndex] = groupName;
-        }
-        this.options.onAddRow(undefined, prefilled);
       });
     });
   }
@@ -462,19 +600,23 @@ export class KanbanView {
     column: TableColumn,
     currentValue: string
   ): void {
-    const popover = new SingleSelectPopover({
+    new SingleSelectPopover({
       app: this.options.app,
       anchorEl: anchor,
       columnName: column.name,
       currentValue,
-      allAvailableTags: column.uniqueTags || [],
+      allAvailableTags: column.uniqueTags ?? [],
       settings: this.options.settings,
-      onSelect: async (selectedTag) => {
-        await this.options.onCellUpdate(rowIndex, colIndex, selectedTag);
+      onTagColorChange: async (tagName, color) => {
+        this.options.settings.customTagColors[tagName.toLowerCase()] = color;
+        await this.options.actions.onTagColorChange(tagName, color);
         this.render();
       },
-    });
-    popover.open();
+      onSelect: async (selectedTag) => {
+        await this.options.actions.onCellUpdate(rowIndex, colIndex, selectedTag);
+        this.render();
+      },
+    }).open();
   }
 
   private openMultiSelectModal(
@@ -483,18 +625,23 @@ export class KanbanView {
     column: TableColumn,
     currentValue: string
   ): void {
-    const modal = new TagSelectModal({
+    new TagSelectModal({
       app: this.options.app,
       settings: this.options.settings,
       columnName: column.name,
       currentValue,
-      allAvailableTags: column.uniqueTags || [],
-      onSave: async (newValue) => {
-        await this.options.onCellUpdate(rowIndex, colIndex, newValue);
+      allAvailableTags: column.uniqueTags ?? [],
+      onTagColorChange: (tagName, color) => {
+        this.options.settings.customTagColors[tagName.toLowerCase()] = color;
+        void this.options.actions.onTagColorChange(tagName, color);
         this.render();
       },
-    });
-    modal.open();
+      onSave: (newValue) => {
+        void this.options.actions.onCellUpdate(rowIndex, colIndex, newValue).then(() => {
+          this.render();
+        });
+      },
+    }).open();
   }
 
   private openDatePickerPopover(
@@ -504,16 +651,15 @@ export class KanbanView {
     currentDate: string
   ): void {
     const col = this.options.columns[colIndex];
-    const popover = new DatePickerPopover({
+    new DatePickerPopover({
       app: this.options.app,
       anchorEl: anchor,
       currentDate,
-      dateFormat: col?.dateFormat || this.options.settings.dateFormat || "YYYY-MM-DD",
+      dateFormat: col?.dateFormat ?? this.options.settings.dateFormat ?? "YYYY-MM-DD",
       onSelectDate: async (newDate) => {
-        await this.options.onCellUpdate(rowIndex, colIndex, newDate);
+        await this.options.actions.onCellUpdate(rowIndex, colIndex, newDate);
         this.render();
       },
-    });
-    popover.open();
+    }).open();
   }
 }

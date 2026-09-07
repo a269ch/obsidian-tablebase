@@ -2,12 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   compareDateStrings,
   formatDateByOption,
+  parseAnyDate,
   parseDateByOption,
 } from "../src/core/date-utils";
 
 describe("date-utils", () => {
   describe("formatDateByOption", () => {
-    const testDate = new Date(2026, 8, 1); // Sept 1, 2026
+    const testDate = new Date(2026, 8, 1);
 
     it("formats YYYY-MM-DD by default", () => {
       expect(formatDateByOption(testDate)).toBe("2026-09-01");
@@ -43,7 +44,7 @@ describe("date-utils", () => {
       const parsed = parseDateByOption("2026-09-01", "YYYY-MM-DD");
       expect(parsed).not.toBeNull();
       expect(parsed?.getFullYear()).toBe(2026);
-      expect(parsed?.getMonth()).toBe(8); // September (0-indexed)
+      expect(parsed?.getMonth()).toBe(8);
       expect(parsed?.getDate()).toBe(1);
     });
 
@@ -97,6 +98,33 @@ describe("date-utils", () => {
       const parsed = parseDateByOption("2026-09-01T12:00:00Z", "DD/MM/YYYY");
       expect(parsed).not.toBeNull();
       expect(parsed?.getFullYear()).toBe(2026);
+    });
+  });
+
+  describe("parseAnyDate", () => {
+    it("parses dates across various formats regardless of preferred format", () => {
+      const iso = parseAnyDate("2026-09-15", "DD.MM.YYYY");
+      expect(iso).not.toBeNull();
+      expect(iso?.getFullYear()).toBe(2026);
+      expect(iso?.getMonth()).toBe(8);
+      expect(iso?.getDate()).toBe(15);
+
+      const dot = parseAnyDate("15.09.2026", "YYYY-MM-DD");
+      expect(dot).not.toBeNull();
+      expect(dot?.getFullYear()).toBe(2026);
+      expect(dot?.getMonth()).toBe(8);
+      expect(dot?.getDate()).toBe(15);
+
+      const slash = parseAnyDate("15/09/2026", "YYYY-MM-DD");
+      expect(slash).not.toBeNull();
+      expect(slash?.getFullYear()).toBe(2026);
+      expect(slash?.getMonth()).toBe(8);
+      expect(slash?.getDate()).toBe(15);
+    });
+
+    it("returns null for non-date inputs", () => {
+      expect(parseAnyDate("")).toBeNull();
+      expect(parseAnyDate("random-text")).toBeNull();
     });
   });
 

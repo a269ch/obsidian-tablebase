@@ -1,167 +1,117 @@
 # TableBase for Obsidian
 
-> 🚀 **Transform standard Obsidian Markdown tables into interactive, Notion-like databases with Kanban Board views, multi-select colored badges, date pickers, calculations, multi-criteria filtering, and CSV export — with 100% zero lock-in.**
+> **Transform standard Markdown tables into beautiful, interactive Notion-like databases and Kanban boards — with 100% zero vendor lock-in.**
 
-[![CI](https://github.com/a269ch/obsidian-tablebase/actions/workflows/ci.yml/badge.svg)](https://github.com/a269ch/obsidian-tablebase/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/a269ch/obsidian-tablebase?color=orange&label=release&logo=github)](https://github.com/a269ch/obsidian-tablebase/releases)
-[![Tests](https://img.shields.io/badge/tests-124%20passed-brightgreen.svg?logo=vitest&logoColor=white)](#development--testing)
-[![Coverage](https://img.shields.io/badge/coverage-96.3%25-brightgreen.svg?logo=vitest&logoColor=white)](#development--testing)
-[![Obsidian](https://img.shields.io/badge/Obsidian-v1.0.0+-7C3AED.svg?logo=obsidian&logoColor=white)](https://obsidian.md)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.7%20Strict-3178C6.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Release](https://img.shields.io/github/v/release/a269ch/obsidian-tablebase?color=orange&label=Release&logo=github)](https://github.com/a269ch/obsidian-tablebase/releases)
+[![Tests](https://img.shields.io/badge/Tests-286%20Passed-brightgreen.svg?logo=vitest&logoColor=white)](https://github.com/a269ch/obsidian-tablebase)
+[![Obsidian](https://img.shields.io/badge/Obsidian-v1.5.0+-7C3AED.svg?logo=obsidian&logoColor=white)](https://obsidian.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Lock-in](https://img.shields.io/badge/Lock--in-Zero%20(Pure%20Markdown)-success.svg?logo=markdown&logoColor=white)](#why-tablebase)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?logo=github)](https://github.com/a269ch/obsidian-tablebase/pulls)
 
 ---
 
-## ✨ Why TableBase?
+## ✨ Overview
 
-Raw Markdown tables in Obsidian are often rigid, painful to edit, and difficult to organize. Traditional database plugins solve this by forcing proprietary JSON blocks, custom schema files, or isolated databases that lock your data into a specific plugin.
+Editing tables in plain Markdown can be frustrating. Moving columns, picking dates, and formatting tags often feels clumsy, while traditional database plugins lock your notes into proprietary files and databases.
 
-**TableBase** solves this fundamentally:
+**TableBase gives you the best of both worlds**:
+An intuitive, fluid, Notion-style visual database experience right inside Obsidian — while keeping your files stored as **100% standard, clean Markdown tables**.
 
-```
-    Raw Markdown Note (.md)
-  ┌─────────────────────────┐
-  │ | Task | Status | Due | │
-  │ | ---- | ------ | --- | │
-  │ | Work | Done   | ... | │
-  └───────────┬─────────────┘
-              ▲
-              │ Non-destructive, instant bidirectional sync
-              ▼
-  ┌─────────────────────────────────────────────────────────┐
-  │                 TableBase Engine                        │
-  │  ┌─────────────────────────┬─────────────────────────┐  │
-  │  │  📋 Interactive Table   │  🗂️ Kanban Board View   │  │
-  │  └─────────────────────────┴─────────────────────────┘  │
-  │  • Multi-select badges     • Drag-and-drop cards        │
-  │  • Single-select popovers  • Context menus (edit/dup)   │
-  │  • Datepicker calendar     • Footer calculations (Sum)  │
-  │  • Granular AND/OR filters • Column resize & reorder    │
-  └─────────────────────────────────────────────────────────┘
-```
-
-- **Zero Lock-In**: Everything is read from and saved back to standard GitHub Flavored Markdown (GFM) tables. If you ever disable the plugin or open your vault in VS Code, GitHub, or any other editor, your data is 100% standard text.
-- **Dual Views**: Seamlessly switch between **`📋 Table`** and **`🗂️ Board`** (Kanban) with one click.
-- **Native Experience**: Matches Obsidian's native look and feel with full Light & Dark theme support.
+* Open your notes on mobile, in VS Code, or on GitHub — your data is always plain, readable text.
+* Turn any table into an interactive database or Kanban board instantly.
 
 ---
 
-## 📊 Feature Comparison
+## 🌟 Key Features
 
-| Feature | Standard Obsidian Tables | Traditional DB Plugins | TableBase |
-| :--- | :---: | :---: | :---: |
-| **Data Storage Format** | Standard Markdown | Proprietary JSON / SQLite | **100% Pure Markdown** |
-| **Zero Vendor Lock-in** | ✅ | ❌ | ✅ |
-| **Kanban Board View** | ❌ | Partial | ✅ **Built-in 1-Click Tab** |
-| **Colored Tag Badges** | ❌ | Partial | ✅ **10 Notion Palettes** |
-| **Single-Select Dropdown** | ❌ | ❌ | ✅ **Instant Popover** |
-| **Interactive Date Picker** | ❌ | ❌ | ✅ **Calendar + Presets** |
-| **Footer Calculation Bar** | ❌ | Partial | ✅ **Sum, Avg, Min, Max, Count** |
-| **AND / OR Filter Rules** | ❌ | Query Language | ✅ **Visual UI Panel** |
-| **Multi-Column Sorting** | ❌ | Complex syntax | ✅ **Clickable Rules** |
-| **Drag & Drop Reordering** | ❌ | ❌ | ✅ **Rows, Cols & Kanban** |
-| **Live Table Search** | ❌ | ❌ | ✅ **Instant Full-Text** |
-| **CSV Export** | ❌ | ❌ | ✅ **1-Click Copy / Download** |
+### 📋 Interactive Notion-Style Tables
+* **Click to Edit**: Double-click any cell or press `Enter` to edit text, numbers, or tags smoothly.
+* **Row Numbers**: Clean, numbered row indicator that lets you select, focus, or delete rows in a click.
+* **Column Resizing & Reordering**: Drag column borders to adjust widths, or drag headers to rearrange fields.
+* **Fast Row Reordering**: Hover over any row and drag the floating handle (`⋮⋮`) in the left margin to reorder rows effortlessly.
 
----
+### 🗂️ 1-Click Kanban Board View
+* **Switch Views Instantly**: Toggle between **Table** and **Board** tabs with a single click.
+* **Drag-and-Drop Cards**: Move task cards between columns (e.g. *Todo* → *In Progress* → *Done*) to update your notes automatically.
+* **Quick Add**: Click `+ New` at the bottom of any column to create pre-categorized cards.
+* **Edit on the Board**: Double-click card titles to rename, or click tag badges and dates directly on cards.
 
-## 🌟 Key Features Breakdown
+### 🏷️ Colored Tags & Multi-Select
+* **Automatic Detection**: Automatically recognizes tag and status columns (`Status`, `Tags`, `Priority`, etc.).
+* **Single-Select Popover**: Quick dropdown menu for single-value statuses (*Todo*, *In Progress*, *Done*).
+* **Multi-Select Badges**: Add multiple colored tags to any cell with search-as-you-type and instant badge creation.
+* **10 Notion-Inspired Color Palettes**: `Gray`, `Brown`, `Orange`, `Yellow`, `Green`, `Blue`, `Purple`, `Pink`, `Red`, and `Default`.
+* **Custom Color Picker**: Pick any custom hex color with automatic text-contrast adaptation for light and dark themes.
 
-### 1. 🎨 Multi-Select & Single-Select Tags (Notion-Themed Badges)
-- **Automatic Detection**: Recognizes status and tag columns automatically (`Tags`, `Status`, `Priority`, `Category`, `Labels`, `Теги`, `Метки`, `Статус`, etc.).
-- **Single-Select (`🔘 Select`)**: Fast 1-click popover for single-value states (e.g., *Todo*, *In Progress*, *Done*).
-- **Multi-Select (`🏷️ Multi-Select`)**: Add, search, and toggle multiple colored badges per cell.
-- **10 Notion-Themed Color Schemes**: `Default`, `Gray`, `Brown`, `Orange`, `Yellow`, `Green`, `Blue`, `Purple`, `Pink`, and `Red`.
-- **Custom Tag Palette**: Pick custom colors per tag with memory across your vault.
+### 📅 Visual Date Picker
+* **Interactive Calendar**: Click any date cell to open a clean calendar popover.
+* **Quick Navigation**: Jump effortlessly across days, months, and years.
+* **Flexible Date Formats**: Supports `YYYY-MM-DD`, `DD.MM.YYYY`, `DD/MM/YYYY`, `MM/DD/YYYY`, and more.
+* **Batch Reformatting**: Changing a column's date format cleanly converts all existing dates in that column.
 
-### 2. 🗂️ Kanban Board View
-- Switch between **`📋 Table`** and **`🗂️ Board`** views with a single click.
-- Group cards by any Select or Multi-Select column.
-- **HTML5 Drag-and-Drop**: Drag task cards between status columns to update values immediately.
-- **Interactive Card Badges**: Click any property on a card to edit dates, tags, numbers, or checkboxes without leaving the board.
-- **Inline Card Editing**: Double-click card titles to rename directly on the board.
-- **Card Context Menu**: Right-click to duplicate, rename, or delete cards.
-- **`+ New` Card Buttons**: Create new records pre-populated with column values.
+### 🔍 Visual Filter & Live Search
+* **No Code Required**: Build powerful filters using a simple visual interface.
+* **Flexible Logic**: Combine rules with **AND** and **OR** conditions (*Where Status is "In Progress" AND Due date is not empty*).
+* **Type-Specific Filters**:
+  * *Tags*: `is one of`, `is not one of`, `contains`, `is empty`...
+  * *Text & Numbers*: `contains`, `equals`, `is empty`...
+  * *Checkboxes*: `is checked`, `is not checked`
+* **Instant Search**: Type in the search box to filter matching rows across all columns in real time.
 
-### 3. 🔍 Advanced Multi-Criteria Filter & Sort Engine
-- **Filter Toolbar**: Add granular rules connected by **`AND`** / **`OR`** conjunction logic.
-- **Type-Aware Filter Operators**:
-  - `is one of` / `is not one of` (multi-tag matching)
-  - `contains` / `does not contain` / `contains all of` / `contains any of`
-  - `equals` / `not equals` / `starts with` / `ends with`
-  - `is empty` / `is not empty` / `is checked` / `is not checked`
-- **Multi-Column Sorting**: Ascending and descending sort rules with natural language, numeric, and date ordering.
-- **Real-Time Live Search**: Instant full-text search across all table rows.
+### 🧮 Summary Calculations
+* Real-time column summaries in the table footer:
+  * **Numbers**: `Sum`, `Average`, `Min`, `Max`, `Count`
+  * **Tags & Text**: `Count all`, `Unique count`, `Empty`, `Not empty`
+  * **Checkboxes**: `Checked count`, `Unchecked count`, `Percent completed`
 
-### 4. 📅 Notion-Style Interactive Date Picker
-- Click on any date cell to open an interactive calendar popover.
-- Quick navigation presets: **Today**, **Tomorrow**, **Next week**, and **Clear**.
-- Full month calendar grid with month/year navigation.
-- Configurable global **Default Date Format** in plugin settings (`YYYY-MM-DD`, `DD.MM.YYYY`, `MM/DD/YYYY`, `YYYY/MM/DD`).
-
-### 5. 📊 Footer Calculations & Summaries (`tfoot`)
-- Compute real-time column aggregates aligned directly below table columns:
-  - **Numeric**: `Sum`, `Average`, `Min`, `Max`, `Count`
-  - **Tags / Text**: `Count all`, `Count values`, `Unique count`, `Empty / Not empty`
-  - **Checkboxes**: `Count checked / unchecked`, `Percent checked / unchecked`
-
-### 6. 🔀 Column & Row Management
-- **Reorder Columns**: Drag table column headers (`th`) left or right to rearrange fields.
-- **Reorder Rows**: Drag row index handles (`#`) up or down to reorder records.
-- **Column Resizing**: Drag column borders to set custom widths.
-- **Context Menus**: Right-click headers or cells to insert, duplicate, hide, or delete properties and rows.
-- **Sticky First Column**: Row indices and primary title columns remain pinned during horizontal scrolling.
-- **Property Visibility (`⚙️ Properties`)**: Show or hide specific columns without deleting markdown data.
-
-### 7. 📤 1-Click CSV Export
-- **Copy as CSV**: Copy clean CSV directly to clipboard for Excel or Google Sheets.
-- **Download CSV**: Save as a `.csv` file with a single click.
-
----
-
-## 🏷️ Optional Explicit Column Type Annotations
-
-TableBase intelligently auto-detects column types. However, if you want to explicitly enforce a column type in your Markdown header, you can append an annotation to the header name:
-
-| Syntax | Type | Description |
-| :--- | :--- | :--- |
-| `Task [text]` | Text | Standard text input |
-| `Status [select]` | Single-Select | Single tag selection popover |
-| `Tags [multi-select]` | Multi-Select | Multiple colored tag pills |
-| `Due [date]` | Date | Calendar popover with default format |
-| `Due [date:DD.MM.YYYY]` | Date | Calendar popover with specific format |
-| `Estimate [number]` | Number | Strict numeric formatting and formulas |
-| `Done [checkbox]` | Checkbox | Toggleable interactive checkbox |
-
-*Note: Annotations are automatically hidden in TableBase view and rendered cleanly.*
+### 📤 1-Click CSV Export
+* **Copy as CSV**: Copy clean CSV directly to your clipboard for Excel, Google Sheets, or Apple Numbers.
+* **Download CSV**: Save your table as a `.csv` file with a single click.
 
 ---
 
 ## 🚀 Quick Start
 
-Create a standard GFM Markdown table in any note:
+### 1. Standard Markdown Table
+Create a normal table in any note:
 
 ```markdown
-| Task | Status | Tags | Deadline | Hours | Done |
-| :--- | :---: | :--- | :---: | :---: | :---: |
-| Build Core Engine | Done | Backend, Core | 2026-09-05 | 12 | [x] |
-| Add Kanban Board | In Progress | Frontend, UI | 2026-09-10 | 8 | [ ] |
-| Write Unit Tests | Done | QA, Testing | 2026-09-12 | 4 | [x] |
-| Documentation | Backlog | Docs | 2026-09-15 | 2 | [ ] |
+| Task | Status | Tags | Due | Done |
+| :--- | :--- | :--- | :--- | :---: |
+| Launch website | In Progress | Marketing, Web | 2026-09-15 | [ ] |
+| Write release notes | Todo | Docs | 2026-09-18 | [ ] |
+| Core refactoring | Done | Dev | 2026-09-07 | [x] |
 ```
 
-Open the note in **Reading View** or **Live Preview** — TableBase automatically renders it as an interactive database.
+Switch to **Reading View** or **Live Preview** — TableBase automatically renders your table as an interactive database.
 
-You can also explicitly scope a table using a code block:
+### 2. Explicit Code Block (Optional)
+You can also use a dedicated ```` ```tablebase ```` code block:
+
 ````markdown
 ```tablebase
-| Task | Status | Priority |
-| Design Mockups | In Progress | High |
-| Code Review | Todo | Medium |
+| Project | Priority | Deadline | Done |
+| Mobile App | High | 2026-10-01 | [ ] |
+| Security Audit | Medium | 2026-10-15 | [x] |
 ```
 ````
+
+---
+
+## 📝 Optional Column Type Hints
+
+TableBase automatically detects column types based on content and header names. If you prefer to explicitly specify a type, simply add a tag to the column title:
+
+| Syntax | Column Type | Behavior |
+| :--- | :--- | :--- |
+| `Task [text]` | Text | Standard text input |
+| `Status [select]` | Single-Select | Single-choice tag dropdown |
+| `Tags [multi-select]` | Multi-Select | Multi-tag badge picker |
+| `Due [date]` | Date | Visual calendar popover |
+| `Due [date:DD.MM.YYYY]` | Date | Calendar with specific format |
+| `Amount [number]` | Number | Strict numeric formatting |
+| `Done [checkbox]` | Checkbox | Centered interactive checkbox |
+
+*Tip: Type tags like `[date]` are automatically hidden in the visual view for a clean appearance.*
 
 ---
 
@@ -169,93 +119,63 @@ You can also explicitly scope a table using a code block:
 
 | Shortcut | Action |
 | :--- | :--- |
-| **`Arrow Keys`** | Navigate between table cells |
-| **`Tab`** / **`Shift + Tab`** | Move focus to next / previous cell |
-| **`Enter`** | Open inline text editor or select popover |
-| **`Escape`** | Cancel inline edit or dismiss popover |
-| **`Delete`** / **`Backspace`** | Clear cell content |
-| **`Double Click`** | Start inline editing |
-| **`Right Click`** | Open context menu (sort, hide, duplicate, delete, reorder) |
+| **`Arrow Keys`** | Move between cells |
+| **`Tab`** / **`Shift + Tab`** | Move to next / previous cell (wraps to next row) |
+| **`Enter`** | Edit cell, toggle checkbox, or open date/tag picker |
+| **`Any letter or digit`** | Start typing immediately to edit the focused cell |
+| **`Escape`** | Cancel editing, close popover, or deselect cell |
+| **`Right Click`** | Open menu (insert/delete rows and columns, change alignment) |
+
+*Tip: Pressing `Tab` on the very last cell of the table automatically adds a new row, allowing rapid data entry without touching the mouse.*
 
 ---
 
-## ⚙️ Configuration
+## 🔒 100% Plain Markdown & Zero Lock-In
 
-Access settings via **Obsidian Settings -> TableBase**:
-
-- **Auto-detect Multi-select Columns**: Toggle automatic detection based on cell content (lists, wikilinks, tags).
-- **Multi-select Column Names**: Customize comma-separated keywords to always treat as tags (`Tags, Status, Categories, Теги, Метки...`).
-- **Default Tag Format**: Choose how tags are written back to Markdown cells:
-  - Comma-separated: `Frontend, UI, Bug`
-  - WikiLinks: `[[Frontend]], [[UI]]`
-  - Hashtags: `#Frontend #UI`
-- **Default Date Format**: Set your preferred default format (`YYYY-MM-DD`, `DD.MM.YYYY`, `MM/DD/YYYY`, `YYYY/MM/DD`).
-- **Custom Tag Colors**: Assign persistent palette colors to specific tag names.
+Your data belongs to you. TableBase:
+* Stores everything as standard GitHub-Flavored Markdown tables.
+* Never alters your note formatting unexpectedly.
+* Does not create hidden sidecar database files.
+* If you disable or uninstall TableBase, your tables remain completely intact, formatted, and readable in any Markdown reader.
 
 ---
 
-## 🎨 CSS Snippets & Customization
+## ⚙️ Settings & Customization
 
-TableBase exposes clean CSS classes and variables that can be customized in Obsidian snippets:
+Configure preferences under **Obsidian Settings → TableBase**:
+* **Default Date Format**: Set your preferred date display (`YYYY-MM-DD`, `DD.MM.YYYY`, etc.).
+* **Default Tag Format**: Choose how tags are written back to Markdown (`Comma-separated`, `#hashtags`, or `[[wikilinks]]`).
+* **Auto-Detection**: Customize header keywords recognized as tags or statuses.
+* **Row Numbers**: Toggle row index numbers on or off globally.
+* **Custom Tag Colors**: Assign permanent colors to specific tags across your entire vault.
 
-```css
-/* Custom TableBase Accent & Colors */
-.ms-notion-database-container {
-  --ms-primary: var(--interactive-accent);
-  --ms-border-color: var(--background-modifier-border);
-  --ms-bg-hover: var(--background-modifier-hover);
-}
+---
 
-/* Custom Kanban Card Styling */
-.ms-kanban-card {
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-}
-```
+## 🛡️ Security & Privacy
+
+TableBase is engineered as a private, local-first extension for Obsidian:
+* **100% Local**: No network requests, telemetry, or remote data transmission. All logic executes strictly inside your local Obsidian vault.
+* **Clipboard Access**: The clipboard API (`navigator.clipboard.writeText`) is invoked exclusively when you select the "Copy table as CSV" option from the export menu. The plugin never reads from the system clipboard.
+* **Data Preservation**: Tables are read and written using Obsidian's official vault APIs to safeguard file history and avoid data loss.
 
 ---
 
 ## 📦 Installation
 
-### Via Obsidian Community Plugins
-*(Submitted / Pending catalog directory indexing)*
-1. Open Obsidian **Settings** -> **Community plugins**.
-2. Search for **TableBase**.
-3. Click **Install**, then **Enable**.
+### From Obsidian Community Plugins
+1. Open Obsidian **Settings** → **Community plugins**.
+2. Ensure **Restricted mode** is disabled.
+3. Click **Browse** and search for **TableBase**.
+4. Click **Install**, then **Enable**.
 
 ### Manual Installation
-1. Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/a269ch/obsidian-tablebase/releases).
-2. Open your Obsidian Vault and navigate to `.obsidian/plugins/`.
-3. Create a folder named `tablebase` and place the downloaded files inside.
-4. Open **Obsidian Settings -> Community plugins**, click **Reload plugins**, and enable **TableBase**.
-
----
-
-## 🛠️ Development & Testing
-
-```bash
-# 1. Clone repository
-git clone https://github.com/a269ch/obsidian-tablebase.git
-cd obsidian-tablebase
-
-# 2. Install dependencies
-npm install
-
-# 3. Run test suite (124 automated tests, 100% passing)
-npm test
-
-# 4. Run test coverage report (96.3% statements coverage)
-npm run test:coverage
-
-# 5. Build production bundle
-npm run build
-
-# 6. Package plugin distribution zip
-npm run package
-```
+1. Download `main.js`, `manifest.json`, and `styles.css` from the [Latest Release](https://github.com/a269ch/obsidian-tablebase/releases).
+2. Open your Obsidian vault folder and navigate to `.obsidian/plugins/`.
+3. Create a folder named `tablebase` and copy the three files into it.
+4. Go to **Settings → Community plugins**, click **Reload plugins**, and turn on **TableBase**.
 
 ---
 
 ## 📄 License
 
-MIT License © 2026 Aleksei Che (a269ch)
+MIT License © 2026 Aleksei Chekodanov

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   COLOR_LIST,
   TAG_PALETTE_COLORS,
+  getColorScheme,
   getHashColor,
   resolveTagColor,
 } from "../src/core/color-palette";
@@ -32,17 +33,32 @@ describe("Color Palette & Hash Algorithm", () => {
     expect(getHashColor("   ")).toBe("default");
   });
 
-  it("should respect custom color overrides", () => {
+  it("should respect custom color overrides including hex colors", () => {
     const customColors = {
       urgent: "red" as const,
       done: "green" as const,
+      special: "#10b981",
     };
 
     expect(resolveTagColor("urgent", customColors)).toBe("red");
     expect(resolveTagColor("URGENT", customColors)).toBe("red");
     expect(resolveTagColor("done", customColors)).toBe("green");
+    expect(resolveTagColor("special", customColors)).toBe("#10b981");
 
     const fallbackColor = resolveTagColor("random-tag", customColors);
     expect(COLOR_LIST).toContain(fallbackColor);
+  });
+
+  it("should return correct color scheme for preset and custom hex colors", () => {
+    const presetScheme = getColorScheme("blue");
+    expect(presetScheme.text).toBe(TAG_PALETTE_COLORS.blue.text);
+
+    const hexScheme = getColorScheme("#10b981");
+    expect(hexScheme.text).toBe("#10b981");
+    expect(hexScheme.bg).toContain("rgba(16, 185, 129");
+    expect(hexScheme.darkBg).toContain("rgba(16, 185, 129");
+
+    const fallbackScheme = getColorScheme(undefined as unknown as import("../src/types").TagColor);
+    expect(fallbackScheme.text).toBe(TAG_PALETTE_COLORS.default.text);
   });
 });

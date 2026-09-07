@@ -1,8 +1,4 @@
-/* =========================================================
-   Notion-Style Database Table & Multi-Select Plugin Styles
-   ========================================================= */
 
-/* --- CSS Variables & Theme Constants --- */
 :root {
   --ms-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --ms-badge-font-size: 0.82em;
@@ -13,9 +9,9 @@
   --ms-text-muted: var(--text-muted, #787774);
   --ms-blue-accent: var(--interactive-accent, #2383e2);
   --ms-focus-ring: #2383e2;
-  --ms-focus-col-bg: rgba(35, 131, 226, 0.05);
-  --ms-focus-row-bg: rgba(35, 131, 226, 0.03);
-  --ms-focus-th-bg: rgba(35, 131, 226, 0.09);
+  --ms-focus-col-bg: rgba(35, 131, 226, 0.08);
+  --ms-focus-row-bg: rgba(35, 131, 226, 0.09);
+  --ms-focus-th-bg: rgba(35, 131, 226, 0.14);
   --ms-card-bg: var(--background-primary, #ffffff);
   --ms-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
@@ -25,15 +21,26 @@
   --ms-bg-hover: rgba(255, 255, 255, 0.06);
   --ms-bg-subtle: rgba(255, 255, 255, 0.04);
   --ms-text-muted: #9b9a97;
-  --ms-focus-col-bg: rgba(46, 170, 220, 0.07);
-  --ms-focus-row-bg: rgba(46, 170, 220, 0.04);
-  --ms-focus-th-bg: rgba(46, 170, 220, 0.12);
+  --ms-focus-col-bg: rgba(46, 170, 220, 0.12);
+  --ms-focus-row-bg: rgba(46, 170, 220, 0.12);
+  --ms-focus-th-bg: rgba(46, 170, 220, 0.20);
   --ms-card-bg: var(--background-secondary, #202020);
   --ms-card-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
-/* --- Notion Database Main Container --- */
-.ms-notion-database-container,
+.ms-notion-database-container {
+  margin: 1.25rem 0;
+  border: 1px solid var(--ms-border);
+  border-radius: 8px;
+  background-color: var(--background-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  font-family: var(--ms-font);
+  font-size: 14px;
+  outline: none;
+  overflow: visible;
+  position: relative;
+}
+
 .ms-notion-kanban-container {
   margin: 1.25rem 0;
   border: 1px solid var(--ms-border);
@@ -44,9 +51,9 @@
   font-size: 14px;
   outline: none;
   overflow: hidden;
+  position: relative;
 }
 
-/* --- Database Top Bar --- */
 .ms-db-top-bar {
   display: flex;
   align-items: center;
@@ -196,8 +203,9 @@
 }
 
 .ms-db-search-wrap input.ms-db-search-input,
+.ms-db-search-wrap input[type="text"].ms-db-search-input,
 input[type="text"].ms-db-search-input {
-  padding: 4px 10px 4px 30px !important;
+  padding: 4px 10px 4px 30px;
   font-size: 0.85em;
   border: 1px solid var(--ms-border);
   border-radius: 5px;
@@ -215,6 +223,8 @@ input[type="text"].ms-db-search-input:focus {
   outline: none;
 }
 
+.ms-notion-database-container button.ms-db-primary-btn,
+.ms-table-toolbar-wrapper button.ms-db-primary-btn,
 button.ms-db-primary-btn {
   display: inline-flex;
   align-items: center;
@@ -224,23 +234,24 @@ button.ms-db-primary-btn {
   height: 28px;
   font-size: 0.85em;
   font-weight: 500;
-  border: none !important;
-  box-shadow: none !important;
-  outline: none !important;
+  border: none;
+  box-shadow: none;
+  outline: none;
   border-radius: 5px;
-  background: transparent !important;
-  color: var(--ms-text-muted) !important;
+  background: transparent;
+  color: var(--ms-text-muted);
   cursor: pointer;
   box-sizing: border-box;
   transition: all 0.15s ease;
 }
 
+.ms-notion-database-container button.ms-db-primary-btn:hover,
+.ms-table-toolbar-wrapper button.ms-db-primary-btn:hover,
 button.ms-db-primary-btn:hover {
-  background-color: var(--ms-bg-hover) !important;
-  color: var(--text-normal) !important;
+  background-color: var(--ms-bg-hover);
+  color: var(--text-normal);
 }
 
-/* --- Filter & Sort Panels --- */
 .ms-table-toolbar-wrapper {
   background: var(--ms-bg-subtle);
   border-bottom: 1px solid var(--ms-border);
@@ -253,28 +264,66 @@ button.ms-db-primary-btn:hover {
 .ms-rules-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .ms-filter-rule-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+  gap: 8px;
+  flex-wrap: nowrap;
 }
 
-.ms-rule-prefix {
+.ms-rule-prefix-wrap {
+  width: 68px;
+  min-width: 68px;
+  max-width: 68px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.ms-rule-prefix-label {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
   font-size: 0.85em;
   font-weight: 500;
   color: var(--ms-text-muted);
+  padding: 0 4px;
+  box-sizing: border-box;
+  white-space: nowrap;
 }
 
-.ms-filter-conjunction-select,
-.ms-filter-column-select,
-.ms-filter-operator-select,
+.ms-conjunction-select,
+.ms-filter-conjunction-select {
+  width: 100%;
+  height: 28px;
+  padding: 4px 6px;
+  font-size: 0.85em;
+  font-weight: 500;
+  border: 1px solid var(--ms-border);
+  border-radius: 5px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  cursor: pointer;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease;
+}
+
+.ms-conjunction-select:hover,
+.ms-filter-conjunction-select:hover {
+  border-color: var(--ms-blue-accent);
+}
+
 .ms-rule-col-select,
-.ms-rule-op-select {
-  padding: 4px 10px;
+.ms-filter-column-select {
+  width: 140px;
+  min-width: 140px;
+  max-width: 140px;
+  height: 28px;
+  padding: 4px 8px;
   font-size: 0.85em;
   border: 1px solid var(--ms-border);
   border-radius: 5px;
@@ -282,25 +331,70 @@ button.ms-db-primary-btn:hover {
   color: var(--text-normal);
   cursor: pointer;
   outline: none;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
   transition: border-color 0.15s ease;
 }
 
-.ms-filter-conjunction-select:hover,
-.ms-filter-column-select:hover,
-.ms-filter-operator-select:hover,
 .ms-rule-col-select:hover,
-.ms-rule-op-select:hover {
+.ms-filter-column-select:hover {
   border-color: var(--ms-blue-accent);
 }
 
-.ms-filter-value-input {
+.ms-rule-op-select,
+.ms-filter-operator-select {
+  width: 140px;
+  min-width: 140px;
+  max-width: 140px;
+  height: 28px;
+  padding: 4px 8px;
+  font-size: 0.85em;
+  border: 1px solid var(--ms-border);
+  border-radius: 5px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  cursor: pointer;
+  outline: none;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: border-color 0.15s ease;
+}
+
+.ms-rule-op-select:hover,
+.ms-filter-operator-select:hover {
+  border-color: var(--ms-blue-accent);
+}
+
+.ms-rule-text-input,
+.ms-filter-value-input,
+input[type="text"].ms-rule-text-input,
+input[type="text"].ms-filter-value-input {
+  width: 200px;
+  min-width: 160px;
+  height: 28px;
   padding: 4px 10px;
   font-size: 0.85em;
   border: 1px solid var(--ms-border);
   border-radius: 5px;
   background: var(--background-primary);
   color: var(--text-normal);
-  min-width: 140px;
+  box-sizing: border-box;
+  outline: none;
+  flex-shrink: 0;
+  transition: border-color 0.15s ease;
+}
+
+.ms-rule-text-input:focus,
+.ms-filter-value-input:focus,
+input[type="text"].ms-rule-text-input:focus,
+input[type="text"].ms-filter-value-input:focus {
+  border-color: var(--ms-blue-accent);
 }
 
 .ms-filter-tag-picker-btn {
@@ -316,7 +410,6 @@ button.ms-db-primary-btn:hover {
   cursor: pointer;
 }
 
-/* Panel Footer (Generous button gap and distinct styling) */
 .ms-panel-footer {
   display: flex;
   align-items: center;
@@ -399,52 +492,239 @@ button.ms-db-primary-btn:hover {
   color: var(--text-error, #eb5757);
 }
 
-/* --- Scrollable Grid Table --- */
+.ms-enhanced-table-wrapper,
+.el-table.ms-enhanced-table-wrapper,
+.table-wrapper.ms-enhanced-table-wrapper,
+.markdown-rendered .ms-enhanced-table-wrapper {
+  overflow: visible;
+}
+
+.ms-table-hidden {
+  display: none;
+}
+
+.ms-floating-popover {
+  position: fixed;
+  z-index: 1000;
+  box-sizing: border-box;
+  overscroll-behavior: contain;
+}
+
+.ms-floating-row-handle {
+  position: absolute;
+  left: -22px;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 24px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 40;
+  user-select: none;
+  -webkit-user-select: none;
+  box-sizing: border-box;
+}
+
+.ms-floating-row-handle.is-visible,
+.ms-floating-row-handle:hover {
+  opacity: 0.85;
+  pointer-events: auto;
+}
+
+.ms-floating-row-handle:hover {
+  opacity: 1;
+}
+
+.ms-row-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 22px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  color: var(--ms-text-muted);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.ms-row-action-btn svg {
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+}
+
+.ms-row-action-btn:hover {
+  background: var(--ms-bg-hover);
+  color: var(--text-normal);
+}
+
+.ms-row-action-grip {
+  cursor: grab;
+}
+
+.ms-row-action-grip:active {
+  cursor: grabbing;
+}
+
 .ms-db-table-scroll-wrapper {
   overflow-x: auto;
   width: 100%;
   position: relative;
+  box-sizing: border-box;
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
 }
 
 .ms-db-grid-table {
-  width: 100%;
+  width: max-content;
+  min-width: 0;
   border-collapse: separate;
   border-spacing: 0;
   table-layout: auto;
-  margin: 0 !important;
+  margin: 0;
 }
 
-/* --- Sticky Row Numbers Column Support --- */
-.ms-db-grid-table.has-row-numbers .ms-db-th-index,
-.ms-db-grid-table.has-row-numbers .ms-db-td-index {
-  position: sticky !important;
-  left: 0 !important;
-  z-index: 20 !important;
-  background: var(--background-primary) !important;
-  border-right: none !important;
-  box-shadow: -10px 0 0 0 var(--background-primary), inset -1px 0 0 0 var(--ms-border) !important;
+.ms-db-th-index {
+  width: 42px;
+  min-width: 42px;
+  max-width: 42px;
+  box-sizing: border-box;
+  text-align: center;
+  vertical-align: middle;
+  padding: 0;
+  border-top: 1px solid var(--ms-border);
+  border-bottom: 1px solid var(--ms-border);
+  border-left: none;
+  border-right: 1px solid var(--ms-border);
+  background: var(--ms-th-bg, var(--background-primary));
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
-.ms-db-grid-table.has-row-numbers thead .ms-db-th-index {
-  background: var(--background-primary) !important;
-  box-shadow: -10px 0 0 0 var(--background-primary), inset -1px 0 0 0 var(--ms-border) !important;
+.ms-db-th-index .ms-db-th-index-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 34px;
+  padding: 0;
+  gap: 0;
+  box-sizing: border-box;
 }
 
-.ms-db-grid-table.has-row-numbers .ms-db-tr.is-row-focused .ms-db-td-index {
-  background: linear-gradient(var(--ms-focus-th-bg), var(--ms-focus-th-bg)), var(--background-primary) !important;
-  color: var(--ms-blue-accent) !important;
+.ms-db-th-index-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: var(--text-normal);
+  opacity: 0.85;
+}
+
+.ms-db-th-index-icon svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.ms-db-td-index {
+  position: relative;
+  width: 42px;
+  min-width: 42px;
+  max-width: 42px;
+  box-sizing: border-box;
+  text-align: center;
+  vertical-align: middle;
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--ms-border);
+  border-left: none;
+  border-right: 1px solid var(--ms-border);
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: pointer;
+  background: var(--background-primary);
+  color: var(--text-normal);
+}
+
+.ms-db-add-row-index-td,
+.ms-calc-index {
+  cursor: default;
+}
+
+.ms-row-num-text {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 10px;
+  box-sizing: border-box;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-normal);
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1;
+  pointer-events: none;
+  width: 100%;
+  height: 100%;
+}
+
+.ms-db-grid-table .ms-db-tr.is-row-focused .ms-db-td-index {
+  background: linear-gradient(var(--ms-focus-th-bg), var(--ms-focus-th-bg)), var(--background-primary);
+  color: var(--ms-blue-accent);
   font-weight: 600;
-  box-shadow: -10px 0 0 0 var(--ms-focus-th-bg), -10px 0 0 0 var(--background-primary), inset -1px 0 0 0 var(--ms-border) !important;
+  box-shadow: inset 0 1px 0 0 var(--ms-blue-accent), inset 0 -1px 0 0 var(--ms-blue-accent), inset 2px 0 0 0 var(--ms-blue-accent);
 }
 
-.ms-db-grid-table.has-row-numbers .ms-db-tr:hover:not(.is-row-focused) .ms-db-td-index {
-  background: linear-gradient(var(--ms-bg-hover), var(--ms-bg-hover)), var(--background-primary) !important;
-  box-shadow: -10px 0 0 0 var(--ms-bg-hover), -10px 0 0 0 var(--background-primary), inset -1px 0 0 0 var(--ms-border) !important;
+.ms-db-grid-table .ms-db-tr.is-row-focused .ms-row-num-text {
+  color: var(--ms-blue-accent);
+  font-weight: 600;
 }
 
-/* --- Table Headers --- */
+.ms-db-grid-table .ms-db-tr:hover:not(.is-row-focused) .ms-db-td-index {
+  background: linear-gradient(var(--ms-bg-hover), var(--ms-bg-hover)), var(--background-primary);
+}
+
+.ms-db-grid-table.no-row-numbers thead th.ms-db-th.is-first-data-col,
+.ms-db-grid-table.no-row-numbers tbody td.ms-db-td.is-first-data-col,
+.ms-db-grid-table.no-row-numbers .ms-db-add-row-td,
+.ms-db-grid-table.no-row-numbers .ms-db-calc-td.is-first-data-col {
+  border-left: none;
+}
+
+.ms-db-grid-table.has-row-numbers .ms-db-th-index,
+.ms-db-grid-table.has-row-numbers .ms-db-td-index,
+.ms-db-grid-table.has-row-numbers .ms-calc-index,
+.ms-db-grid-table.has-row-numbers .ms-db-add-row-index-td {
+  position: sticky;
+  left: 0;
+  z-index: 20;
+  background: var(--background-primary);
+}
+
+.ms-db-th.is-dragging-col {
+  opacity: 0.4;
+  background: var(--ms-bg-hover);
+}
+
 .ms-db-grid-table thead tr {
   height: 34px;
+}
+
+.ms-db-grid-table thead th {
+  padding: 0;
+  height: 34px;
+  vertical-align: middle;
+  box-sizing: border-box;
 }
 
 .ms-db-th {
@@ -453,7 +733,7 @@ button.ms-db-primary-btn:hover {
   height: 34px;
   font-weight: 500;
   font-size: 0.85em;
-  color: var(--ms-text-muted);
+  color: var(--text-normal);
   border-bottom: 1px solid var(--ms-border);
   border-right: 1px solid var(--ms-border);
   background: var(--background-primary);
@@ -468,14 +748,14 @@ button.ms-db-primary-btn:hover {
 }
 
 .ms-db-th.is-col-focused {
-  background-color: var(--ms-focus-th-bg) !important;
-  color: var(--text-normal) !important;
-  border-bottom: 2px solid var(--ms-blue-accent) !important;
+  background-color: var(--ms-focus-th-bg);
+  color: var(--text-normal);
+  border-bottom: 2px solid var(--ms-blue-accent);
 }
 
 .ms-db-th.is-col-focused .ms-db-type-icon {
-  color: var(--ms-blue-accent) !important;
-  opacity: 1 !important;
+  color: var(--ms-blue-accent);
+  opacity: 1;
 }
 
 .ms-db-th.is-col-focused .ms-db-col-name {
@@ -488,7 +768,7 @@ button.ms-db-primary-btn:hover {
 }
 
 .ms-db-th.is-col-drop-target {
-  border-left: 3px solid var(--ms-blue-accent) !important;
+  border-left: 3px solid var(--ms-blue-accent);
 }
 
 .ms-db-th-content {
@@ -527,18 +807,22 @@ button.ms-db-primary-btn:hover {
   line-height: 1.2;
 }
 
-.ms-index-strut {
-  visibility: hidden;
-  width: 0 !important;
-  max-width: 0 !important;
-  min-width: 0 !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  overflow: hidden;
-  line-height: 1.2;
-  font-size: 0.85em;
-  font-weight: 500;
-  flex: 0 0 0px !important;
+/* All table headers are strictly aligned to the left */
+.ms-db-th .ms-db-th-content,
+.ms-db-th.is-align-left .ms-db-th-content,
+.ms-db-th.is-align-center .ms-db-th-content,
+.ms-db-th.is-align-right .ms-db-th-content,
+.ms-db-th.is-col-type-checkbox .ms-db-th-content {
+  justify-content: flex-start;
+}
+
+.ms-db-th .ms-db-col-name,
+.ms-db-th.is-align-left .ms-db-col-name,
+.ms-db-th.is-align-center .ms-db-col-name,
+.ms-db-th.is-align-right .ms-db-col-name,
+.ms-db-th.is-col-type-checkbox .ms-db-col-name {
+  flex: 1;
+  text-align: left;
 }
 
 .ms-db-sort-indicator {
@@ -564,55 +848,62 @@ button.ms-db-primary-btn:hover {
   background-color: var(--ms-blue-accent);
 }
 
-.ms-db-th-index {
-  width: 42px !important;
-  min-width: 42px !important;
-  max-width: 42px !important;
-  padding: 0 !important;
-  text-align: center;
+.ms-db-th-add-col {
+  width: 28px;
+  min-width: 28px;
+  max-width: 28px;
+  height: 34px;
   border-bottom: 1px solid var(--ms-border);
   border-right: 1px solid var(--ms-border);
+  padding: 0;
+  margin: 0;
+  text-align: center;
   vertical-align: middle;
-  height: 34px;
+  background: var(--background-primary);
+  cursor: pointer;
   box-sizing: border-box;
+  transition: background-color 0.12s ease;
 }
 
-.ms-db-th-index-content {
+.ms-db-th-add-col .ms-db-th-add-col-content {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 !important;
-  gap: 0 !important;
   width: 100%;
-  height: 34px;
+  height: 100%;
   min-height: 34px;
-  max-height: 34px;
+  padding: 0;
+  margin: 0;
+  gap: 0;
   box-sizing: border-box;
 }
 
-.ms-db-th-index-icon {
+.ms-db-th-add-col-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 14px;
   height: 14px;
+  min-width: 14px;
+  min-height: 14px;
+  flex-shrink: 0;
+  margin: 0 auto;
+  padding: 0;
+  line-height: 0;
   color: var(--ms-text-muted);
   opacity: 0.85;
+  transition: color 0.12s ease, opacity 0.12s ease;
 }
 
-.ms-db-th-add-col {
-  width: 36px;
-  min-width: 36px;
-  max-width: 36px;
-  border-bottom: 1px solid var(--ms-border);
-  border-right: 1px solid var(--ms-border);
+.ms-db-th-add-col-icon svg,
+.ms-db-th-add-col svg,
+.ms-db-th-add-col button.ms-db-add-col-btn svg {
+  display: block;
+  width: 13px;
+  height: 13px;
+  margin: 0;
   padding: 0;
-  text-align: center;
-  vertical-align: middle;
-  background: var(--background-primary);
-  height: 100%;
-  cursor: pointer;
-  transition: background-color 0.12s ease;
+  vertical-align: 0;
 }
 
 .ms-db-th-add-col button.ms-db-add-col-btn {
@@ -620,20 +911,16 @@ button.ms-db-primary-btn:hover {
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: 100%;
-  min-height: 31px;
+  height: 34px;
   margin: 0;
-  border: none !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  outline: none !important;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
   color: var(--ms-text-muted);
   cursor: pointer;
-  font-size: 1.15em;
-  font-weight: 300;
-  line-height: 1;
   border-radius: 0;
-  padding: 0 !important;
   pointer-events: none;
   transition: color 0.12s ease;
 }
@@ -641,54 +928,56 @@ button.ms-db-primary-btn:hover {
 .ms-db-th-add-col button.ms-db-add-col-btn:hover,
 .ms-db-th-add-col button.ms-db-add-col-btn:focus,
 .ms-db-th-add-col button.ms-db-add-col-btn:active {
-  background: transparent !important;
-  box-shadow: none !important;
-  border: none !important;
-  outline: none !important;
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  outline: none;
 }
 
 .ms-db-td-spacer,
 .ms-db-td-add-col {
-  width: 36px;
-  min-width: 36px;
-  max-width: 36px;
+  width: 28px;
+  min-width: 28px;
+  max-width: 28px;
   border-bottom: 1px solid var(--ms-border);
   border-right: 1px solid var(--ms-border);
   background: transparent;
   padding: 0;
   cursor: pointer;
+  box-sizing: border-box;
   transition: background-color 0.12s ease;
 }
 
 .ms-db-calc-tr .ms-db-td-add-col {
-  border-bottom: none !important;
+  border-bottom: none;
 }
 
-/* Whole Add Column column hover highlight */
 .ms-db-grid-table.is-add-col-hovered .ms-db-th-add-col,
 .ms-db-grid-table.is-add-col-hovered .ms-db-td-add-col {
-  background-color: var(--ms-bg-hover) !important;
+  background-color: var(--ms-bg-hover);
 }
 
-.ms-db-grid-table.is-add-col-hovered .ms-db-add-col-btn {
-  color: var(--text-normal) !important;
+.ms-db-grid-table.is-add-col-hovered .ms-db-add-col-btn,
+.ms-db-grid-table.is-add-col-hovered .ms-db-th-add-col-icon,
+.ms-db-th-add-col:hover .ms-db-th-add-col-icon,
+.ms-db-th-add-col:hover .ms-db-add-col-btn {
+  color: var(--text-normal);
 }
 
-/* Whole Add Column column active/clicked highlight */
 .ms-db-grid-table.is-add-col-active .ms-db-th-add-col {
-  background-color: var(--ms-focus-th-bg) !important;
-  border-bottom: 2px solid var(--ms-blue-accent) !important;
+  background-color: var(--ms-focus-th-bg);
+  border-bottom: 2px solid var(--ms-blue-accent);
 }
 
 .ms-db-grid-table.is-add-col-active .ms-db-td-add-col {
-  background-color: var(--ms-focus-col-bg) !important;
+  background-color: var(--ms-focus-col-bg);
 }
 
-.ms-db-grid-table.is-add-col-active .ms-db-add-col-btn {
-  color: var(--ms-blue-accent) !important;
+.ms-db-grid-table.is-add-col-active .ms-db-add-col-btn,
+.ms-db-grid-table.is-add-col-active .ms-db-th-add-col-icon {
+  color: var(--ms-blue-accent);
 }
 
-/* --- Table Cells --- */
 .ms-db-tr {
   transition: background-color 0.1s ease;
 }
@@ -702,19 +991,34 @@ button.ms-db-primary-btn:hover {
 }
 
 .ms-db-tr.is-dragging-row {
-  opacity: 0.4;
+  opacity: 0.35;
 }
 
-.ms-db-tr.is-row-drop-target {
-  border-top: 3px solid var(--ms-blue-accent) !important;
+.ms-db-tr.is-row-drop-target td,
+.ms-db-tr.is-row-drop-target-top td {
+  box-shadow: inset 0 3px 0 0 var(--ms-blue-accent);
 }
 
-.ms-db-tr.is-row-focused {
-  background-color: var(--ms-focus-row-bg) !important;
+.ms-db-tr.is-row-drop-target-bottom td {
+  box-shadow: inset 0 -3px 0 0 var(--ms-blue-accent);
 }
 
-.ms-db-tr.is-row-focused:hover {
-  background-color: var(--ms-focus-row-bg) !important;
+.ms-db-tr.is-row-focused,
+.ms-db-tr.is-row-focused > td.ms-db-td {
+  background-color: var(--ms-focus-row-bg);
+}
+
+.ms-db-tr.is-row-focused:hover,
+.ms-db-tr.is-row-focused:hover > td.ms-db-td {
+  background-color: var(--ms-focus-row-bg);
+}
+
+.ms-db-tr.is-row-focused > td.ms-db-td {
+  box-shadow: inset 0 1px 0 0 var(--ms-blue-accent), inset 0 -1px 0 0 var(--ms-blue-accent);
+}
+
+.ms-db-grid-table.no-row-numbers .ms-db-tr.is-row-focused td.is-first-data-col {
+  box-shadow: inset 0 1px 0 0 var(--ms-blue-accent), inset 0 -1px 0 0 var(--ms-blue-accent), inset 2px 0 0 0 var(--ms-blue-accent);
 }
 
 .ms-db-td {
@@ -732,28 +1036,14 @@ button.ms-db-primary-btn:hover {
 }
 
 .ms-db-td.is-focused {
-  outline: 2px solid var(--ms-focus-ring) !important;
+  outline: 2px solid var(--ms-focus-ring);
   outline-offset: -2px;
-  background-color: var(--background-primary) !important;
-  z-index: 10 !important;
+  background-color: var(--background-primary);
+  z-index: 10;
 }
 
 .ms-db-td.is-editing {
-  padding: 0 !important;
-}
-
-.ms-db-td-index {
-  width: 42px !important;
-  min-width: 42px !important;
-  max-width: 42px !important;
-  box-sizing: border-box !important;
-  text-align: center;
-  font-size: 0.8em;
-  color: var(--ms-text-muted);
-  border-bottom: 1px solid var(--ms-border);
-  user-select: none;
-  padding: 6px 0;
-  cursor: grab;
+  padding: 0;
 }
 
 .ms-cell-text-wrapper {
@@ -771,60 +1061,148 @@ button.ms-db-primary-btn:hover {
 .ms-db-grid-table .ms-db-td input.ms-inline-cell-input,
 .theme-dark .ms-db-grid-table .ms-db-td input.ms-inline-cell-input,
 .theme-light .ms-db-grid-table .ms-db-td input.ms-inline-cell-input {
-  width: 100% !important;
-  height: 100% !important;
-  min-height: 32px !important;
-  border: none !important;
-  outline: none !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  background: transparent !important;
-  padding: 6px 10px !important;
-  margin: 0 !important;
-  font-family: inherit !important;
-  font-size: inherit !important;
-  line-height: 1.4 !important;
-  color: inherit !important;
-  display: block !important;
-  box-sizing: border-box !important;
+  width: 100%;
+  height: 100%;
+  min-height: 32px;
+  border: none;
+  outline: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  padding: 6px 10px;
+  margin: 0;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: 1.4;
+  color: inherit;
+  display: block;
+  box-sizing: border-box;
 }
 
 .ms-inline-cell-input.is-number,
 .ms-db-grid-table .ms-db-td input.ms-inline-cell-input.is-number {
-  text-align: right !important;
-  font-variant-numeric: tabular-nums !important;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .ms-inline-cell-input:focus,
 .ms-db-grid-table .ms-db-td input.ms-inline-cell-input:focus,
 .theme-dark .ms-db-grid-table .ms-db-td input.ms-inline-cell-input:focus,
 .theme-light .ms-db-grid-table .ms-db-td input.ms-inline-cell-input:focus {
-  border: none !important;
-  outline: none !important;
-  box-shadow: none !important;
-  background: transparent !important;
+  border: none;
+  outline: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+.ms-db-td.is-align-left {
+  text-align: left;
+}
+
+.ms-db-td.is-align-center {
+  text-align: center;
+}
+
+.ms-db-td.is-align-right {
+  text-align: right;
+}
+
+.ms-db-td.is-align-left .ms-cell-text-wrapper {
+  text-align: left;
+}
+
+.ms-db-td.is-align-left .ms-cell-text-wrapper.is-number {
+  text-align: right;
+}
+
+.ms-db-td.is-align-center .ms-cell-text-wrapper,
+.ms-db-td.is-align-center .ms-cell-text-wrapper.is-number {
+  text-align: center;
+}
+
+.ms-db-td.is-align-right .ms-cell-text-wrapper,
+.ms-db-td.is-align-right .ms-cell-text-wrapper.is-number {
+  text-align: right;
+}
+
+.ms-db-td.is-align-left .ms-cell-badges-container {
+  justify-content: flex-start;
+}
+
+.ms-db-td.is-align-center .ms-cell-badges-container {
+  justify-content: center;
+}
+
+.ms-db-td.is-align-right .ms-cell-badges-container {
+  justify-content: flex-end;
+}
+
+.ms-db-td.is-align-left .ms-cell-checkbox-wrapper,
+.ms-db-td.is-align-center .ms-cell-checkbox-wrapper,
+.ms-db-td.is-align-right .ms-cell-checkbox-wrapper {
+  justify-content: center;
+}
+
+.ms-db-td.is-align-left .ms-cell-date-wrapper {
+  justify-content: flex-start;
+}
+
+.ms-db-td.is-align-center .ms-cell-date-wrapper {
+  justify-content: center;
+}
+
+.ms-db-td.is-align-right .ms-cell-date-wrapper {
+  justify-content: flex-end;
+}
+
+.ms-inline-cell-input.is-align-left,
+.ms-db-grid-table .ms-db-td input.ms-inline-cell-input.is-align-left {
+  text-align: left;
+}
+
+.ms-inline-cell-input.is-align-center,
+.ms-db-grid-table .ms-db-td input.ms-inline-cell-input.is-align-center,
+.ms-db-grid-table .ms-db-td input.ms-inline-cell-input.is-number.is-align-center {
+  text-align: center;
+}
+
+.ms-inline-cell-input.is-align-right,
+.ms-db-grid-table .ms-db-td input.ms-inline-cell-input.is-align-right,
+.ms-db-grid-table .ms-db-td input.ms-inline-cell-input.is-number {
+  text-align: right;
+}
+
+.ms-db-calc-td.is-align-left {
+  text-align: left;
+}
+
+.ms-db-calc-td.is-align-center {
+  text-align: center;
+}
+
+.ms-db-calc-td.is-align-right {
+  text-align: right;
 }
 
 .ms-kanban-card .ms-kanban-prop-badge input.ms-inline-cell-input {
-  width: auto !important;
-  min-width: 40px !important;
-  height: auto !important;
-  min-height: unset !important;
-  padding: 0 2px !important;
-  background: transparent !important;
-  border-radius: 0 !important;
+  width: auto;
+  min-width: 40px;
+  height: auto;
+  min-height: unset;
+  padding: 0 2px;
+  background: transparent;
+  border-radius: 0;
 }
 
 .ms-kanban-card .ms-kanban-card-title input.ms-inline-cell-input {
-  width: 100% !important;
-  height: auto !important;
-  min-height: unset !important;
-  padding: 2px 4px !important;
-  background: transparent !important;
-  border-radius: 0 !important;
+  width: 100%;
+  height: auto;
+  min-height: unset;
+  padding: 2px 4px;
+  background: transparent;
+  border-radius: 0;
 }
 
-/* --- Checkbox Cell --- */
 .ms-cell-checkbox-wrapper {
   display: flex;
   align-items: center;
@@ -838,7 +1216,6 @@ button.ms-db-primary-btn:hover {
   accent-color: var(--ms-blue-accent);
 }
 
-/* --- Date Cell --- */
 .ms-cell-date-wrapper {
   display: inline-flex;
   align-items: center;
@@ -856,7 +1233,6 @@ button.ms-db-primary-btn:hover {
   color: var(--ms-text-muted);
 }
 
-/* --- Multi-Select Badges & Cells --- */
 .ms-cell-badges-container {
   display: flex;
   flex-wrap: wrap;
@@ -905,8 +1281,10 @@ button.ms-db-primary-btn:hover {
   opacity: 0.5;
 }
 
-/* --- Bottom + New Row (inside tbody) --- */
 .ms-db-add-row-tr {
+  height: 28px;
+  min-height: 28px;
+  max-height: 28px;
   background: transparent;
 }
 
@@ -915,36 +1293,56 @@ button.ms-db-primary-btn:hover {
 }
 
 .ms-db-add-row-td {
-  padding: 0 !important;
-  border-bottom: 1px solid var(--ms-border) !important;
-  border-right: none !important;
+  height: 28px;
+  min-height: 28px;
+  max-height: 28px;
+  padding: 0;
+  border-bottom: 1px solid var(--ms-border);
+  border-right: 1px solid var(--ms-border);
+  box-sizing: border-box;
 }
 
+.ms-db-add-row-index-td {
+  height: 28px;
+  min-height: 28px;
+  max-height: 28px;
+  box-sizing: border-box;
+}
+
+.ms-db-grid-table button.ms-db-add-row-btn,
 button.ms-db-add-row-btn {
   display: flex;
   align-items: center;
   gap: 6px;
   width: 100%;
-  padding: 7px 12px !important;
-  border: none !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  outline: none !important;
-  color: var(--ms-text-muted) !important;
+  height: 28px;
+  min-height: 28px;
+  max-height: 28px;
+  padding: 0 12px;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+  color: var(--ms-text-muted);
   font-size: 0.85em;
   font-weight: 400;
   cursor: pointer;
   text-align: left;
-  border-radius: 0 !important;
+  border-radius: 0;
+  box-sizing: border-box;
   transition: all 0.12s ease;
 }
 
-button.ms-db-add-row-btn:hover {
-  background: var(--ms-bg-hover) !important;
-  color: var(--text-normal) !important;
+button.ms-db-add-row-btn svg {
+  margin: 0;
 }
 
-/* --- Table Footer Calculations (tfoot) --- */
+.ms-db-grid-table button.ms-db-add-row-btn:hover,
+button.ms-db-add-row-btn:hover {
+  background: var(--ms-bg-hover);
+  color: var(--text-normal);
+}
+
 .ms-db-tfoot {
   background: var(--ms-bg-subtle);
 }
@@ -986,6 +1384,7 @@ button.ms-db-add-row-btn:hover {
 
 .ms-calc-label {
   font-weight: 500;
+  margin-right: 4px;
 }
 
 .ms-calc-val {
@@ -993,7 +1392,6 @@ button.ms-db-add-row-btn:hover {
   color: var(--text-normal);
 }
 
-/* --- Kanban Board View Styles --- */
 .ms-kanban-board-wrapper {
   display: flex;
   gap: 14px;
@@ -1102,7 +1500,7 @@ button.ms-db-add-row-btn:hover {
 }
 
 .ms-kanban-card.is-card-drop-target {
-  border-top: 2px solid var(--ms-blue-accent) !important;
+  border-top: 2px solid var(--ms-blue-accent);
 }
 
 .ms-kanban-card-title {
@@ -1138,7 +1536,22 @@ button.ms-db-add-row-btn:hover {
   color: var(--text-normal);
 }
 
+.ms-kanban-prop-badge.is-checkbox {
+  font-weight: 500;
+}
+
+.ms-kanban-prop-badge.is-checkbox.is-checked {
+  color: var(--text-normal);
+}
+
+.ms-kanban-prop-badge.is-checkbox.is-checked svg {
+  color: var(--interactive-accent, #3399ff);
+}
+
 .ms-kanban-bottom-add-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   width: 100%;
   padding: 7px 12px;
   border: none;
@@ -1155,18 +1568,49 @@ button.ms-db-add-row-btn:hover {
   color: var(--text-normal);
 }
 
-/* --- Dropdown Menus --- */
 .ms-col-header-menu {
   background: var(--background-primary);
   border: 1px solid var(--ms-border);
   border-radius: 8px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
   min-width: 190px;
+  max-width: min(340px, calc(100vw - 20px));
+  max-height: min(450px, calc(100vh - 40px));
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
   padding: 6px;
   display: flex;
   flex-direction: column;
   gap: 3px;
   z-index: 1000;
+  box-sizing: border-box;
+}
+
+.ms-col-header-menu::-webkit-scrollbar {
+  width: 5px;
+}
+
+.ms-col-header-menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ms-col-header-menu::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb-bg, rgba(125, 125, 125, 0.25));
+  border-radius: 4px;
+}
+
+.ms-col-header-menu::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-active-thumb-bg, rgba(125, 125, 125, 0.45));
+}
+
+.ms-props-menu {
+  min-width: 220px;
+  max-width: 290px;
+}
+
+.ms-prop-toggle-item {
+  user-select: none;
 }
 
 .ms-col-menu-name-row {
@@ -1196,7 +1640,7 @@ input[type="text"].ms-col-menu-name-input {
   background: var(--background-secondary, rgba(0, 0, 0, 0.03));
   border: 1px solid var(--ms-border);
   border-radius: 5px;
-  padding: 4px 8px !important;
+  padding: 4px 8px;
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -1274,7 +1718,6 @@ input[type="text"].ms-col-menu-name-input:focus {
   padding: 4px 8px;
 }
 
-/* --- Date Picker Popover --- */
 .ms-date-picker-popover {
   width: 250px;
   padding: 10px;
@@ -1337,8 +1780,8 @@ input[type="text"].ms-col-menu-name-input:focus {
 }
 
 .ms-date-grid-item.is-selected {
-  background-color: var(--ms-blue-accent) !important;
-  color: #ffffff !important;
+  background-color: var(--ms-blue-accent);
+  color: #ffffff;
   font-weight: 600;
 }
 
@@ -1398,12 +1841,11 @@ input[type="text"].ms-col-menu-name-input:focus {
 }
 
 .ms-date-day-cell.is-selected {
-  background-color: var(--ms-blue-accent) !important;
-  color: #ffffff !important;
+  background-color: var(--ms-blue-accent);
+  color: #ffffff;
   font-weight: 600;
 }
 
-/* --- Tag Modal --- */
 .ms-tag-modal-container {
   display: flex;
   flex-direction: column;
@@ -1421,7 +1863,7 @@ input[type="text"].ms-col-menu-name-input:focus {
 }
 
 .ms-modal-footer button {
-  margin: 0 !important;
+  margin: 0;
 }
 
 .ms-selected-tags-area {
@@ -1471,13 +1913,203 @@ input[type="text"].ms-col-menu-name-input:focus {
 }
 
 .ms-color-dot.is-active {
-  border-color: var(--ms-blue-accent) !important;
+  border-color: var(--ms-blue-accent);
 }
 
-/* --- Single Select Popover --- */
+.ms-tag-color-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  color: var(--ms-text-muted);
+  cursor: pointer;
+  opacity: 0.6;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.ms-tag-color-btn:hover {
+  opacity: 1;
+  background-color: var(--ms-bg-hover);
+  color: var(--ms-blue-accent);
+}
+
+.ms-tag-color-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.ms-color-palette-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ms-color-swatch-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: transform 0.12s ease, box-shadow 0.15s ease;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.ms-color-swatch-dot.ms-color-default { background-color: #8f8e8b; }
+.ms-color-swatch-dot.ms-color-gray    { background-color: #787774; }
+.ms-color-swatch-dot.ms-color-brown   { background-color: #976a4a; }
+.ms-color-swatch-dot.ms-color-orange  { background-color: #d9730d; }
+.ms-color-swatch-dot.ms-color-yellow  { background-color: #dfab01; }
+.ms-color-swatch-dot.ms-color-green   { background-color: #448361; }
+.ms-color-swatch-dot.ms-color-blue    { background-color: #337ea9; }
+.ms-color-swatch-dot.ms-color-purple  { background-color: #9065b0; }
+.ms-color-swatch-dot.ms-color-pink    { background-color: #c14c8a; }
+.ms-color-swatch-dot.ms-color-red     { background-color: #eb5757; }
+
+.theme-dark .ms-color-swatch-dot.ms-color-default { background-color: #9b9a97; }
+.theme-dark .ms-color-swatch-dot.ms-color-gray    { background-color: #9b9a97; }
+.theme-dark .ms-color-swatch-dot.ms-color-brown   { background-color: #ba856f; }
+.theme-dark .ms-color-swatch-dot.ms-color-orange  { background-color: #f18d3b; }
+.theme-dark .ms-color-swatch-dot.ms-color-yellow  { background-color: #e9b84e; }
+.theme-dark .ms-color-swatch-dot.ms-color-green   { background-color: #5dbb82; }
+.theme-dark .ms-color-swatch-dot.ms-color-blue    { background-color: #5da7d7; }
+.theme-dark .ms-color-swatch-dot.ms-color-purple  { background-color: #b388dc; }
+.theme-dark .ms-color-swatch-dot.ms-color-pink    { background-color: #e26ea9; }
+.theme-dark .ms-color-swatch-dot.ms-color-red     { background-color: #ff6d67; }
+
+.ms-color-swatch-dot:hover {
+  transform: scale(1.22);
+}
+
+.ms-color-swatch-dot.is-selected {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--background-primary), 0 0 0 4px var(--ms-blue-accent);
+  transform: scale(1.15);
+}
+
+.theme-dark .ms-color-swatch-dot.is-selected {
+  box-shadow: 0 0 0 2px #202020, 0 0 0 4px #529cca;
+}
+
+.ms-color-custom-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  cursor: pointer;
+  overflow: hidden;
+  border: 1.5px solid var(--ms-border);
+  background: var(--background-primary);
+  box-sizing: border-box;
+  position: relative;
+  transition: border-color 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease;
+  flex-shrink: 0;
+}
+
+.theme-dark .ms-color-custom-wrapper {
+  border-color: rgba(255, 255, 255, 0.25);
+  background: #202020;
+}
+
+.ms-color-custom-wrapper:hover {
+  transform: scale(1.18);
+  border-color: var(--ms-blue-accent);
+}
+
+.ms-color-custom-wrapper.is-selected {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--background-primary), 0 0 0 4px var(--ms-blue-accent);
+  transform: scale(1.15);
+}
+
+.theme-dark .ms-color-custom-wrapper.is-selected {
+  box-shadow: 0 0 0 2px #202020, 0 0 0 4px #529cca;
+}
+
+.ms-color-custom-wrapper::before {
+  content: "";
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red);
+}
+
+.ms-color-custom-input {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.ms-select-option-wrapper,
+.ms-tag-item-wrapper,
+.ms-create-option-wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.ms-select-option-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.ms-select-option-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.ms-tag-item-color-picker-wrap {
+  padding: 8px 10px;
+  background: var(--ms-bg-subtle);
+  border-radius: 6px;
+  margin: 4px 0 6px 0;
+  border: 1px solid var(--ms-border);
+}
+
+.theme-dark .ms-tag-item-color-picker-wrap {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.ms-settings-tag-colors-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 16px 0;
+}
+
+.ms-settings-empty-notice {
+  font-size: 0.9em;
+  color: var(--ms-text-muted);
+  font-style: italic;
+  padding: 8px 0;
+}
+
 .ms-select-popover {
-  min-width: 220px;
-  max-width: 320px;
+  min-width: 240px;
+  max-width: 340px;
   padding: 6px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
   background: var(--background-primary);
@@ -1488,18 +2120,51 @@ input[type="text"].ms-col-menu-name-input:focus {
   border-bottom: 1px solid var(--ms-border);
 }
 
-.ms-popover-search-input {
+.ms-popover-search-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
   width: 100%;
-  padding: 5px 8px;
+}
+
+.ms-popover-search-icon {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ms-text-muted);
+  pointer-events: none;
+  width: 14px;
+  height: 14px;
+  z-index: 1;
+}
+
+.ms-popover-search-icon svg {
+  width: 13px;
+  height: 13px;
+  display: block;
+}
+
+.ms-popover-search-wrap input.ms-popover-search-input,
+input[type="text"].ms-popover-search-input {
+  width: 100%;
+  height: 28px;
+  padding: 4px 8px 4px 28px;
   font-size: 0.85em;
   border: 1px solid var(--ms-border);
   border-radius: 4px;
   background: var(--ms-bg-subtle);
   color: var(--text-normal);
   outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease;
 }
 
-.ms-popover-search-input:focus {
+.ms-popover-search-wrap input.ms-popover-search-input:focus,
+input[type="text"].ms-popover-search-input:focus {
   border-color: var(--ms-blue-accent);
 }
 
@@ -1507,7 +2172,7 @@ input[type="text"].ms-col-menu-name-input:focus {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  max-height: 240px;
+  max-height: 280px;
   overflow-y: auto;
   padding-top: 4px;
 }
@@ -1534,6 +2199,7 @@ input[type="text"].ms-col-menu-name-input:focus {
 .ms-create-option-item {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 5px 8px;
   border-radius: 4px;
   cursor: pointer;
@@ -1541,7 +2207,6 @@ input[type="text"].ms-col-menu-name-input:focus {
   font-weight: 500;
 }
 
-/* --- Add Column Modal Type Picker --- */
 .ms-modal-add-column {
   padding: 4px 8px;
 }
@@ -1556,9 +2221,9 @@ input[type="text"].ms-col-menu-name-input:focus {
 
 .ms-modal-name-input-wrap input.ms-modal-name-input,
 input[type="text"].ms-modal-name-input {
-  width: 100% !important;
+  width: 100%;
   box-sizing: border-box;
-  padding: 8px 12px !important;
+  padding: 8px 12px;
   font-size: 0.95em;
   height: 38px;
   border: 1px solid var(--ms-border);
@@ -1573,6 +2238,18 @@ input[type="text"].ms-modal-name-input {
 input[type="text"].ms-modal-name-input:focus {
   border-color: var(--ms-blue-accent);
   box-shadow: 0 0 0 1px var(--ms-blue-accent);
+}
+
+.ms-modal-name-input-wrap input.ms-modal-name-input.is-invalid,
+input[type="text"].ms-modal-name-input.is-invalid {
+  border-color: var(--text-error, #e5534b);
+  box-shadow: 0 0 0 1px var(--text-error, #e5534b);
+}
+
+.ms-modal-name-error {
+  margin-top: 6px;
+  font-size: 0.85em;
+  color: var(--text-error, #e5534b);
 }
 
 .ms-modal-type-section {

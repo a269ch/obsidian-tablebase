@@ -1,4 +1,5 @@
 import {
+  ColumnAlignment,
   ColumnType,
   DateFormatOption,
   MarkdownTableData,
@@ -6,10 +7,7 @@ import {
   TableColumn,
 } from "../types";
 import { formatDateByOption, parseDateByOption } from "./date-utils";
-
-/**
- * Pure state mutators for in-memory MarkdownTableData and TableColumn structures.
- */
+import { formatColumnAlignmentToken } from "./markdown-parser";
 
 export function applyCellUpdate(
   tableData: MarkdownTableData,
@@ -28,10 +26,10 @@ export function applyAddRow(
   atIndex?: number,
   prefilledCells?: string[]
 ): MarkdownTableRow {
-  const newRowCells =
+  const newRowCells: string[] =
     prefilledCells && prefilledCells.length === columnCount
       ? [...prefilledCells]
-      : new Array(columnCount).fill("");
+      : new Array<string>(columnCount).fill("");
 
   const insertIdx =
     atIndex !== undefined && atIndex >= 0 && atIndex <= tableData.rows.length
@@ -79,14 +77,21 @@ export function applyDeleteRow(
   return removed || null;
 }
 
+// Trailing header type tag: "Due [date:DD.MM.YYYY]" -> group 1 = type, group 2 = optional date format
 export const TYPE_ANNOTATION_REGEX =
   /\s*\[(text|multi-select|select|number|checkbox|date)(?::([^\]]+))?\]$/i;
 
+// Whole-header match for headers that imply a single-choice column
 export const SINGLE_SELECT_KEYWORDS =
-  /^(status|статус|priority|приоритет|state|состояние|stage|этап)$/i;
+  /^(status|priority|state|stage)$/i;
 
+// Whole-header match for headers that imply a multi-value column
 export const MULTI_SELECT_KEYWORDS =
-  /^(tags?|labels?|categories|category|keywords?|теги?|метки?|категори[яи])$/i;
+  /^(tags?|labels?|categories|category|keywords?)$/i;
+
+// Whole-header match for headers that imply a date column
+export const DATE_KEYWORDS =
+  /^(date|dates|due\s*date|due|duedate|deadline|deadlines|scheduled?|schedule|created(\s*at)?|updated(\s*at)?|modified(\s*at)?|start(\s*date)?|end(\s*date)?|target(\s*date)?|completed(\s*at)?|closed(\s*at)?|published(\s*at)?|release(\s*date)?|day|timestamp)$/i;
 
 export function stripTypeAnnotation(name: string): string {
   return name.replace(TYPE_ANNOTATION_REGEX, "").trim();
@@ -99,7 +104,11 @@ export function formatColumnHeader(
 ): string {
   const cleanName = stripTypeAnnotation(name);
   if (type === "text") {
-    if (SINGLE_SELECT_KEYWORDS.test(cleanName) || MULTI_SELECT_KEYWORDS.test(cleanName)) {
+    if (
+      SINGLE_SELECT_KEYWORDS.test(cleanName) ||
+      MULTI_SELECT_KEYWORDS.test(cleanName) ||
+      DATE_KEYWORDS.test(cleanName)
+    ) {
       return `${cleanName} [text]`;
     }
     return cleanName;
@@ -134,12 +143,20 @@ export function applyAddColumn(
   const cleanName = stripTypeAnnotation(name);
 
   tableData.headers.splice(insertIdx, 0, headerText);
+  if (tableData.alignments) {
+    tableData.alignments.splice(
+      insertIdx,
+      0,
+      type === "checkbox" ? ":---:" : type === "number" ? "---:" : "---"
+    );
+  }
   tableData.rows.forEach((r) => r.cells.splice(insertIdx, 0, ""));
 
   const newCol: TableColumn = {
     name: cleanName,
     index: insertIdx,
     type,
+    align: type === "checkbox" ? "center" : type === "number" ? "right" : "left",
     ...(type === "date" ? { dateFormat: dateFormat || "YYYY-MM-DD" } : {}),
   };
 
@@ -194,6 +211,19 @@ export function applyChangeColumnType(
   if (!col) return;
 
   col.type = newType;
+  if (newType === "checkbox") {
+    col.align = "center";
+    if (tableData.alignments && colIndex < tableData.alignments.length) {
+      tableData.alignments[colIndex] = ":---:";
+    }
+  } else if (newType === "number") {
+    if (!col.align || col.align === "left") {
+      col.align = "right";
+      if (tableData.alignments && colIndex < tableData.alignments.length) {
+        tableData.alignments[colIndex] = "---:";
+      }
+    }
+  }
   if (newType === "date") {
     col.dateFormat = dateFormat || col.dateFormat || "YYYY-MM-DD";
   } else {
@@ -229,7 +259,6 @@ export function applyChangeColumnDateFormat(
     tableData.headers[colIndex] = headerText;
   }
 
-  // Also convert existing cells
   if (oldFormat !== newDateFormat) {
     for (const row of tableData.rows) {
       const cell = (row.cells[colIndex] || "").trim();
@@ -250,12 +279,35 @@ export function applyDeleteColumn(
 ): void {
   if (colIndex >= 0 && colIndex < tableData.headers.length) {
     tableData.headers.splice(colIndex, 1);
+    if (tableData.alignments && colIndex < tableData.alignments.length) {
+      tableData.alignments.splice(colIndex, 1);
+    }
     tableData.rows.forEach((r) => r.cells.splice(colIndex, 1));
   }
   if (colIndex >= 0 && colIndex < columns.length) {
     columns.splice(colIndex, 1);
     columns.forEach((c, idx) => (c.index = idx));
   }
+}
+
+export function applyChangeColumnAlignment(
+  tableData: MarkdownTableData,
+  columns: TableColumn[],
+  colIndex: number,
+  newAlignment: ColumnAlignment
+): void {
+  if (colIndex < 0 || colIndex >= columns.length) return;
+  const col = columns[colIndex];
+  if (col) {
+    col.align = newAlignment;
+  }
+  if (!tableData.alignments) {
+    tableData.alignments = new Array<string>(tableData.headers.length).fill("---");
+  }
+  while (tableData.alignments.length < tableData.headers.length) {
+    tableData.alignments.push("---");
+  }
+  tableData.alignments[colIndex] = formatColumnAlignmentToken(newAlignment);
 }
 
 export function applyReorderRows(
@@ -300,6 +352,11 @@ export function applyReorderColumns(
 
   const [movedHeader] = tableData.headers.splice(fromIndex, 1);
   tableData.headers.splice(toIndex, 0, movedHeader);
+
+  if (tableData.alignments && tableData.alignments.length > fromIndex) {
+    const [movedAlign] = tableData.alignments.splice(fromIndex, 1);
+    tableData.alignments.splice(toIndex, 0, movedAlign);
+  }
 
   tableData.rows.forEach((r) => {
     const [movedCell] = r.cells.splice(fromIndex, 1);

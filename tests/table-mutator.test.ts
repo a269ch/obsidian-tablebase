@@ -3,6 +3,7 @@ import {
   applyAddColumn,
   applyAddRow,
   applyCellUpdate,
+  applyChangeColumnAlignment,
   applyChangeColumnDateFormat,
   applyChangeColumnType,
   applyDeleteColumn,
@@ -83,13 +84,11 @@ describe("Table Mutator Engine", () => {
     expect(columns[1].type).toBe("select");
     expect(tableData.rows[0].cells.length).toBe(4);
 
-    // Renaming a select column preserves its select type via tag
     applyRenameColumn(tableData, columns, 1, "Severity");
     expect(tableData.headers[1]).toBe("Severity [select]");
     expect(columns[1].name).toBe("Severity");
     expect(columns[1].type).toBe("select");
 
-    // Adding explicit types
     applyAddColumn(tableData, columns, "Due Date", "date");
     expect(tableData.headers[4]).toBe("Due Date [date:YYYY-MM-DD]");
     expect(columns[4].name).toBe("Due Date");
@@ -115,7 +114,7 @@ describe("Table Mutator Engine", () => {
 
   it("should change column type and format header", () => {
     const { tableData, columns } = createSampleTable();
-    // Task is initially text
+
     expect(columns[0].type).toBe("text");
     expect(tableData.headers[0]).toBe("Task");
 
@@ -178,7 +177,6 @@ describe("Table Mutator Engine", () => {
     expect(applyDeleteRow(tableData, 99)).toBeNull();
     expect(applyDuplicateRow(tableData, 99)).toBeNull();
 
-    // Reorder no-ops
     applyReorderRows(tableData, 0, 0);
     applyReorderRows(tableData, -1, 1);
     applyReorderRows(tableData, 0, 99);
@@ -188,5 +186,30 @@ describe("Table Mutator Engine", () => {
     applyReorderColumns(tableData, columns, -1, 1);
     applyReorderColumns(tableData, columns, 0, 99);
     expect(tableData.headers[0]).toBe("Task");
+  });
+
+  it("should change column alignment and keep alignments array in sync", () => {
+    const { tableData, columns } = createSampleTable();
+
+    applyChangeColumnAlignment(tableData, columns, 1, "center");
+    expect(columns[1].align).toBe("center");
+    expect(tableData.alignments[1]).toBe(":---:");
+
+    applyChangeColumnAlignment(tableData, columns, 0, "right");
+    expect(columns[0].align).toBe("right");
+    expect(tableData.alignments[0]).toBe("---:");
+
+    applyChangeColumnAlignment(tableData, columns, 1, "left");
+    expect(columns[1].align).toBe("left");
+    expect(tableData.alignments[1]).toBe(":---");
+
+    applyAddColumn(tableData, columns, "NewCol", "text", 1);
+    expect(tableData.alignments).toEqual(["---:", "---", ":---", "---"]);
+
+    applyReorderColumns(tableData, columns, 0, 2);
+    expect(tableData.alignments).toEqual(["---", ":---", "---:", "---"]);
+
+    applyDeleteColumn(tableData, columns, 1);
+    expect(tableData.alignments).toEqual(["---", "---:", "---"]);
   });
 });

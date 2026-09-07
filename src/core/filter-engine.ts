@@ -8,16 +8,10 @@ import {
 } from "../types";
 import { parseCellTags } from "./tag-parser";
 
-/**
- * Normalizes string for case-insensitive and trimmed comparison.
- */
 export function normalize(str: string): string {
   return (str || "").trim().toLowerCase();
 }
 
-/**
- * Parses and normalizes filter input into an array of non-empty strings.
- */
 export function parseFilterValues(filterValue: string | string[]): string[] {
   if (Array.isArray(filterValue)) {
     return filterValue.map(normalize).filter((v) => v.length > 0);
@@ -29,9 +23,6 @@ export function parseFilterValues(filterValue: string | string[]): string[] {
   return [];
 }
 
-/**
- * Evaluates a single filter rule against a cell value.
- */
 export function evaluateRuleOnCell(
   cellValue: string,
   columnType: ColumnType,
@@ -130,9 +121,6 @@ export function evaluateRuleOnCell(
   }
 }
 
-/**
- * Evaluates a single rule against a table row.
- */
 export function evaluateRuleOnRow(
   row: MarkdownTableRow,
   rule: FilterRule,
@@ -152,9 +140,6 @@ export function evaluateRuleOnRow(
   return evaluateRuleOnCell(cellValue, colType, rule.operator, rule.value);
 }
 
-/**
- * Evaluates the full TableFilterState on a table row.
- */
 export function evaluateFilterStateOnRow(
   row: MarkdownTableRow,
   filterState: TableFilterState,
@@ -170,25 +155,25 @@ export function evaluateFilterStateOnRow(
     }
   }
 
-  const activeRules = filterState.rules.filter((r) => r.enabled);
+  const activeRules = (filterState.rules || []).filter((r) => r.enabled);
   if (activeRules.length === 0) {
     return true;
   }
 
-  if (filterState.conjunction === "AND") {
-    return activeRules.every((rule) =>
-      evaluateRuleOnRow(row, rule, columns)
-    );
-  } else {
-    return activeRules.some((rule) =>
-      evaluateRuleOnRow(row, rule, columns)
-    );
+  let result = evaluateRuleOnRow(row, activeRules[0], columns);
+  for (let i = 1; i < activeRules.length; i++) {
+    const rule = activeRules[i];
+    const ruleMatches = evaluateRuleOnRow(row, rule, columns);
+    const conj = rule.conjunction || filterState.conjunction || "AND";
+    if (conj === "OR") {
+      result = result || ruleMatches;
+    } else {
+      result = result && ruleMatches;
+    }
   }
+  return result;
 }
 
-/**
- * Filters rows based on the filter state.
- */
 export function filterTableRows(
   rows: MarkdownTableRow[],
   filterState: TableFilterState,
@@ -213,9 +198,6 @@ export interface FilterOperatorDefinition {
   label: string;
 }
 
-/**
- * Returns available filter operators and UI labels for a specific column type.
- */
 export function getFilterOperatorsForColumnType(colType: ColumnType): FilterOperatorDefinition[] {
   if (colType === "multi-select" || colType === "select") {
     return [

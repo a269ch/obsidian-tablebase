@@ -5,7 +5,7 @@ import {
   getCalculationOptionsForColumnType,
   isCellFilled,
 } from "../src/core/calculation-engine";
-import { MarkdownTableRow } from "../src/types";
+import { CalculationType, MarkdownTableRow } from "../src/types";
 
 describe("Calculation Engine", () => {
   const rows: MarkdownTableRow[] = [
@@ -19,7 +19,7 @@ describe("Calculation Engine", () => {
     expect(calculateColumnSummary(rows, 0, "count_all", "text")?.value).toBe("4");
     expect(calculateColumnSummary(rows, 0, "count_values", "text")?.value).toBe("3");
     expect(calculateColumnSummary(rows, 0, "count_empty", "text")?.value).toBe("1");
-    expect(calculateColumnSummary(rows, 1, "count_unique", "multi-select")?.value).toBe("3"); // frontend, ui, backend
+    expect(calculateColumnSummary(rows, 1, "count_unique", "multi-select")?.value).toBe("3");
   });
 
   it("should calculate sum, average, min, max for numbers", () => {
@@ -68,8 +68,10 @@ describe("Calculation Engine", () => {
 
   it("should return null for none or unsupported calculation type", () => {
     expect(calculateColumnSummary(rows, 0, "none", "text")).toBeNull();
-    // @ts-expect-error test unknown calc type
-    expect(calculateColumnSummary(rows, 0, "unknown", "text")).toBeNull();
+
+    expect(
+      calculateColumnSummary(rows, 0, "unknown" as CalculationType, "text")
+    ).toBeNull();
   });
 
   it("should handle empty cell lists for number aggregations", () => {

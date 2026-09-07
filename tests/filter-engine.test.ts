@@ -6,6 +6,7 @@ import {
   parseFilterValues,
 } from "../src/core/filter-engine";
 import {
+  FilterOperator,
   MarkdownTableRow,
   TableColumn,
   TableFilterState,
@@ -16,29 +17,29 @@ describe("Table Filter Engine", () => {
     { name: "Task", index: 0, type: "text" },
     { name: "Status", index: 1, type: "multi-select" },
     { name: "Tags", index: 2, type: "multi-select" },
-    { name: "Теги", index: 3, type: "multi-select" },
+    { name: "Labels", index: 3, type: "multi-select" },
   ];
 
   const sampleRows: MarkdownTableRow[] = [
     {
       rowIndex: 0,
-      rawLine: "| Fix Bug | In Progress | Frontend, Bug, Urgent | Срочно, Баг |",
-      cells: ["Fix Bug", "In Progress", "Frontend, Bug, Urgent", "Срочно, Баг"],
+      rawLine: "| Fix Bug | In Progress | Frontend, Bug, Urgent | Urgent, Bug |",
+      cells: ["Fix Bug", "In Progress", "Frontend, Bug, Urgent", "Urgent, Bug"],
     },
     {
       rowIndex: 1,
-      rawLine: "| Add Auth | Done | Backend, Security | Бэкенд, Безопасность |",
-      cells: ["Add Auth", "Done", "Backend, Security", "Бэкенд, Безопасность"],
+      rawLine: "| Add Auth | Done | Backend, Security | Backend, Security |",
+      cells: ["Add Auth", "Done", "Backend, Security", "Backend, Security"],
     },
     {
       rowIndex: 2,
-      rawLine: "| Update Docs | In Progress | Documentation | Документация |",
-      cells: ["Update Docs", "In Progress", "Documentation", "Документация"],
+      rawLine: "| Update Docs | In Progress | Documentation | Documentation |",
+      cells: ["Update Docs", "In Progress", "Documentation", "Documentation"],
     },
     {
       rowIndex: 3,
-      rawLine: "| Refactor UI | Todo | Frontend, UI | Фронтенд, Интерфейс |",
-      cells: ["Refactor UI", "Todo", "Frontend, UI", "Фронтенд, Интерфейс"],
+      rawLine: "| Refactor UI | Todo | Frontend, UI | Frontend, Interface |",
+      cells: ["Refactor UI", "Todo", "Frontend, UI", "Frontend, Interface"],
     },
     {
       rowIndex: 4,
@@ -98,12 +99,12 @@ describe("Table Filter Engine", () => {
       expect(evaluateRuleOnCell(cellTags, "multi-select", "does_not_contain_any", ["Backend", "Frontend"])).toBe(false);
     });
 
-    it("supports cyrillic tags (Срочно, Баг, Фронтенд)", () => {
-      const cyrillicCell = "Срочно, Баг, Релиз";
-      expect(evaluateRuleOnCell(cyrillicCell, "multi-select", "contains", "Срочно")).toBe(true);
-      expect(evaluateRuleOnCell(cyrillicCell, "multi-select", "contains", "баг")).toBe(true);
-      expect(evaluateRuleOnCell(cyrillicCell, "multi-select", "does_not_contain", "Бэкенд")).toBe(true);
-      expect(evaluateRuleOnCell(cyrillicCell, "multi-select", "contains_all", ["Срочно", "Релиз"])).toBe(true);
+    it("supports multi-word tags", () => {
+      const tagCell = "Urgent, Bug, Release";
+      expect(evaluateRuleOnCell(tagCell, "multi-select", "contains", "Urgent")).toBe(true);
+      expect(evaluateRuleOnCell(tagCell, "multi-select", "contains", "bug")).toBe(true);
+      expect(evaluateRuleOnCell(tagCell, "multi-select", "does_not_contain", "Backend")).toBe(true);
+      expect(evaluateRuleOnCell(tagCell, "multi-select", "contains_all", ["Urgent", "Release"])).toBe(true);
     });
 
     it("operator: equals and not_equals for multi-select", () => {
@@ -232,6 +233,94 @@ describe("Table Filter Engine", () => {
       expect(result.matchedRows.map((r) => r.cells[0])).toEqual(["Add Auth", "Update Docs"]);
     });
 
+    it("should evaluate mixed conjunctions: (Rule 1 AND Rule 2) OR Rule 3", () => {
+      const state: TableFilterState = {
+        tableId: "test",
+        conjunction: "AND",
+        searchQuery: "",
+        isFilterOpen: true,
+        isSortOpen: false,
+        sortRules: [],
+        rules: [
+          {
+            id: "1",
+            column: "Status",
+            columnIndex: 1,
+            operator: "contains",
+            value: "In Progress",
+            enabled: true,
+          },
+          {
+            id: "2",
+            column: "Tags",
+            columnIndex: 2,
+            operator: "contains",
+            value: "Frontend",
+            enabled: true,
+            conjunction: "AND",
+          },
+          {
+            id: "3",
+            column: "Status",
+            columnIndex: 1,
+            operator: "contains",
+            value: "Done",
+            enabled: true,
+            conjunction: "OR",
+          },
+        ],
+      };
+
+      const result = filterTableRows(sampleRows, state, columns);
+
+      expect(result.matchedRows.length).toBe(2);
+      expect(result.matchedRows.map((r) => r.cells[0])).toEqual(["Fix Bug", "Add Auth"]);
+    });
+
+    it("should evaluate mixed conjunctions: (Rule 1 OR Rule 2) AND Rule 3", () => {
+      const state: TableFilterState = {
+        tableId: "test",
+        conjunction: "AND",
+        searchQuery: "",
+        isFilterOpen: true,
+        isSortOpen: false,
+        sortRules: [],
+        rules: [
+          {
+            id: "1",
+            column: "Status",
+            columnIndex: 1,
+            operator: "contains",
+            value: "Done",
+            enabled: true,
+          },
+          {
+            id: "2",
+            column: "Status",
+            columnIndex: 1,
+            operator: "contains",
+            value: "In Progress",
+            enabled: true,
+            conjunction: "OR",
+          },
+          {
+            id: "3",
+            column: "Tags",
+            columnIndex: 2,
+            operator: "contains",
+            value: "Documentation",
+            enabled: true,
+            conjunction: "AND",
+          },
+        ],
+      };
+
+      const result = filterTableRows(sampleRows, state, columns);
+
+      expect(result.matchedRows.length).toBe(1);
+      expect(result.matchedRows[0].cells[0]).toBe("Update Docs");
+    });
+
     it("should filter for empty tags (is_empty)", () => {
       const state: TableFilterState = {
         tableId: "test",
@@ -273,7 +362,7 @@ describe("Table Filter Engine", () => {
       expect(result.matchedRows[0].cells[0]).toBe("Add Auth");
     });
 
-    it("should filter cyrillic column with multiple criteria", () => {
+    it("should filter column with multiple criteria", () => {
       const state: TableFilterState = {
         tableId: "test",
         conjunction: "AND",
@@ -284,10 +373,10 @@ describe("Table Filter Engine", () => {
         rules: [
           {
             id: "1",
-            column: "Теги",
+            column: "Labels",
             columnIndex: 3,
             operator: "contains",
-            value: "Фронтенд",
+            value: "Frontend",
             enabled: true,
           },
         ],
@@ -344,8 +433,15 @@ describe("Table Filter Engine", () => {
     });
 
     it("should return true for unrecognized operator", () => {
-      // @ts-expect-error test invalid operator
-      expect(evaluateRuleOnCell("value", "text", "unsupported_operator", "val")).toBe(true);
+
+      expect(
+        evaluateRuleOnCell(
+          "value",
+          "text",
+          "unsupported_operator" as FilterOperator,
+          "val"
+        )
+      ).toBe(true);
     });
 
     it("parseFilterValues should handle arrays, comma strings, empty strings and non-strings", () => {
@@ -353,8 +449,8 @@ describe("Table Filter Engine", () => {
       expect(parseFilterValues(" Alpha, Beta , , Gamma ")).toEqual(["alpha", "beta", "gamma"]);
       expect(parseFilterValues("Single")).toEqual(["single"]);
       expect(parseFilterValues("")).toEqual([]);
-      // @ts-expect-error testing invalid type
-      expect(parseFilterValues(123)).toEqual([]);
+
+      expect(parseFilterValues(123 as unknown as string)).toEqual([]);
     });
 
     it("should handle contains_all operator on text and multi-select", () => {

@@ -15,7 +15,7 @@ export class RenameColumnModal extends Modal {
     this.options = options;
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass("ms-modal-rename-column");
@@ -46,35 +46,25 @@ export class RenameColumnModal extends Modal {
       }
     });
 
-    setTimeout(() => {
+    window.setTimeout(() => {
       nameInput.focus();
       nameInput.select();
     }, 50);
 
     new Setting(contentEl)
-      .addButton((btn) => {
-        btn
-          .setButtonText("Save")
-          .setCta()
-          .onClick(() => this.submit());
-      })
-      .addButton((btn) => {
-        btn
-          .setButtonText("Cancel")
-          .onClick(() => this.close());
-      });
+      .addButton((btn) => btn.setButtonText("Save").setCta().onClick(() => this.submit()))
+      .addButton((btn) => btn.setButtonText("Cancel").onClick(() => this.close()));
   }
 
   private submit(): void {
-    const raw = this.nameInputEl ? this.nameInputEl.value : "";
-    const trimmed = raw.trim();
+    const trimmed = (this.nameInputEl?.value ?? "").trim();
     if (!trimmed) return;
 
-    this.options.onSave(trimmed);
+    void this.options.onSave(trimmed);
     this.close();
   }
 
-  onClose(): void {
+  override onClose(): void {
     this.contentEl.empty();
   }
 }

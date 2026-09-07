@@ -1,19 +1,22 @@
 import { describe, it, expect } from "vitest";
 import {
-  splitTableRow,
-  isDelimiterRow,
-  parseMarkdownTables,
-  serializeMarkdownTable,
-  updateCellInDocument,
-  addRowToDocument,
-  deleteRowFromDocument,
   addColumnToDocument,
-  renameColumnInDocument,
+  addRowToDocument,
+  changeColumnAlignmentInDocument,
   deleteColumnFromDocument,
-  reorderRowInDocument,
-  reorderColumnInDocument,
-  mutateTableInDocument,
+  deleteRowFromDocument,
   exportTableToCSV,
+  formatColumnAlignmentToken,
+  isDelimiterRow,
+  mutateTableInDocument,
+  parseColumnAlignment,
+  parseMarkdownTables,
+  renameColumnInDocument,
+  reorderColumnInDocument,
+  reorderRowInDocument,
+  serializeMarkdownTable,
+  splitTableRow,
+  updateCellInDocument,
 } from "../src/core/markdown-parser";
 
 describe("Markdown Table Parser & Serializer", () => {
@@ -141,6 +144,43 @@ End of doc.`;
       expect(newTables[0].rows.length).toBe(3);
     });
 
+    it("should insert a row at an explicit index instead of appending", () => {
+      const tables = parseMarkdownTables(originalDoc);
+      const startLine = tables[0].startLine;
+
+      const updatedDoc = addRowToDocument(
+        originalDoc,
+        startLine,
+        ["Inserted", "New"],
+        undefined,
+        undefined,
+        0
+      );
+
+      const newTables = parseMarkdownTables(updatedDoc);
+      expect(newTables[0].rows.length).toBe(3);
+      expect(newTables[0].rows[0].cells[0]).toBe("Inserted");
+      expect(newTables[0].rows.map((r) => r.rowIndex)).toEqual([0, 1, 2]);
+    });
+
+    it("should append when the requested insert index is out of range", () => {
+      const tables = parseMarkdownTables(originalDoc);
+      const startLine = tables[0].startLine;
+
+      const updatedDoc = addRowToDocument(
+        originalDoc,
+        startLine,
+        ["Appended", "Tag"],
+        undefined,
+        undefined,
+        99
+      );
+
+      const newTables = parseMarkdownTables(updatedDoc);
+      const rows = newTables[0].rows;
+      expect(rows[rows.length - 1].cells[0]).toBe("Appended");
+    });
+
     it("should delete a row from document", () => {
       const tables = parseMarkdownTables(originalDoc);
       const startLine = tables[0].startLine;
@@ -212,7 +252,7 @@ End of doc.`;
 
     it("should export table to CSV with hidden columns excluded", () => {
       const tables = parseMarkdownTables(originalDoc);
-      const csv = exportTableToCSV(tables[0], [1]); // Hide Tags column
+      const csv = exportTableToCSV(tables[0], [1]);
       expect(csv).toContain("Task");
       expect(csv).not.toContain("Tags");
       expect(csv).toContain("Task 1");
@@ -225,6 +265,7 @@ End of doc.`;
         table.headers.push("Extra");
         table.alignments.push("---");
         table.rows.forEach((r) => r.cells.push("val"));
+        return true;
       });
       const newTables = parseMarkdownTables(updated);
       expect(newTables[0].rows[0].cells[0]).toBe("Mutated 1");
@@ -274,6 +315,52 @@ End of doc.`;
       expect(deleteColumnFromDocument(originalDoc, 0, 99)).toBe(originalDoc);
       expect(renameColumnInDocument(originalDoc, 0, 99, "New")).toBe(originalDoc);
     });
+
+    it("should change column alignment in document", () => {
+      const doc = `# Notes
+| Title | Count | Status |
+| --- | --- | --- |
+| Task 1 | 5 | Done |`;
+
+      const updated1 = changeColumnAlignmentInDocument(doc, 1, 1, "right");
+      const tables1 = parseMarkdownTables(updated1);
+      expect(tables1[0].alignments[1]).toBe("----:");
+      expect(parseColumnAlignment(tables1[0].alignments[1])).toBe("right");
+
+      const updated2 = changeColumnAlignmentInDocument(updated1, 1, 2, "center");
+      const tables2 = parseMarkdownTables(updated2);
+      expect(tables2[0].alignments[2]).toBe(":----:");
+      expect(parseColumnAlignment(tables2[0].alignments[2])).toBe("center");
+
+      const updated3 = changeColumnAlignmentInDocument(updated2, 1, 0, "left");
+      const tables3 = parseMarkdownTables(updated3);
+      expect(tables3[0].alignments[0]).toBe(":-----");
+      expect(parseColumnAlignment(tables3[0].alignments[0])).toBe("left");
+
+      expect(changeColumnAlignmentInDocument(doc, 1, 99, "center")).toBe(doc);
+    });
+  });
+
+  describe("Column Alignment Helpers", () => {
+    it("should parse various alignment delimiter tokens", () => {
+      expect(parseColumnAlignment(":---:")).toBe("center");
+      expect(parseColumnAlignment(":-:")).toBe("center");
+      expect(parseColumnAlignment(":------:")).toBe("center");
+      expect(parseColumnAlignment("---:")).toBe("right");
+      expect(parseColumnAlignment("--:")).toBe("right");
+      expect(parseColumnAlignment(":---")).toBe("left");
+      expect(parseColumnAlignment(":--")).toBe("left");
+      expect(parseColumnAlignment("---")).toBe("left");
+      expect(parseColumnAlignment("")).toBe("left");
+      expect(parseColumnAlignment(undefined)).toBe("left");
+    });
+
+    it("should format alignment tokens with desired minimum width", () => {
+      expect(formatColumnAlignmentToken("center", 3)).toBe(":---:");
+      expect(formatColumnAlignmentToken("right", 3)).toBe("---:");
+      expect(formatColumnAlignmentToken("left", 3)).toBe(":---");
+      expect(formatColumnAlignmentToken("center", 6)).toBe(":----:");
+      expect(formatColumnAlignmentToken("right", 6)).toBe("-----:");
+    });
   });
 });
-

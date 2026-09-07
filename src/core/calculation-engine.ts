@@ -21,9 +21,6 @@ export function extractNumbers(cells: string[]): number[] {
   return nums;
 }
 
-/**
- * Calculates a summary value for a column across table rows.
- */
 export function calculateColumnSummary(
   rows: MarkdownTableRow[],
   columnIndex: number,
@@ -126,9 +123,6 @@ export interface CalculationOption {
   label: string;
 }
 
-/**
- * Returns allowed calculation summary types and display labels for a given column type.
- */
 export function getCalculationOptionsForColumnType(type: ColumnType): CalculationOption[] {
   if (type === "number") {
     return [

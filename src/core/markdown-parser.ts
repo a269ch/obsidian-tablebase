@@ -1,8 +1,5 @@
-import { MarkdownTableData, MarkdownTableRow } from "../types";
+import { ColumnAlignment, MarkdownTableData, MarkdownTableRow } from "../types";
 
-/**
- * Escapes pipe characters inside markdown table cells.
- */
 export function escapeTableCell(content: string): string {
   if (!content || !content.includes("|")) return content || "";
 
@@ -44,17 +41,6 @@ export function escapeTableCell(content: string): string {
   return result;
 }
 
-/**
- * Unescapes pipe characters for internal processing.
- */
-export function unescapeTableCell(content: string): string {
-  return content.replace(/\\\|/g, "|");
-}
-
-/**
- * Splits a markdown table row line into raw cell strings, respecting escaped pipes,
- * Obsidian wikilinks ([[Note|Alias]]), and inline code spans (`a|b`).
- */
 export function splitTableRow(line: string): string[] {
   const trimmed = line.trim();
   let content = trimmed;
@@ -107,9 +93,6 @@ export function splitTableRow(line: string): string[] {
   return cells;
 }
 
-/**
- * Checks if a line is a markdown table delimiter row (e.g. | --- | :---: | ---: |).
- */
 export function isDelimiterRow(line: string): boolean {
   const trimmed = line.trim();
   if (!trimmed.includes("-")) return false;
@@ -117,13 +100,37 @@ export function isDelimiterRow(line: string): boolean {
   const cells = splitTableRow(trimmed);
   if (cells.length === 0) return false;
 
+  // A delimiter cell is dashes with optional leading/trailing alignment colons
   return cells.every((cell) => /^:?-+:?$/.test(cell.trim()));
 }
 
-/**
- * Parses markdown document text and extracts all GFM table structures.
- */
+export function parseColumnAlignment(raw?: string): ColumnAlignment {
+  if (!raw) return "left";
+  const trimmed = raw.trim();
+  const starts = trimmed.startsWith(":");
+  const ends = trimmed.endsWith(":");
+  if (starts && ends) return "center";
+  if (ends) return "right";
+  return "left";
+}
+
+export function formatColumnAlignmentToken(align: ColumnAlignment, width = 3): string {
+  if (width <= 3) {
+    if (align === "center") return ":---:";
+    if (align === "right") return "---:";
+    return ":---";
+  }
+  if (align === "center") {
+    return ":" + "-".repeat(Math.max(1, width - 2)) + ":";
+  } else if (align === "right") {
+    return "-".repeat(Math.max(1, width - 1)) + ":";
+  } else {
+    return ":" + "-".repeat(Math.max(1, width - 1));
+  }
+}
+
 export function parseMarkdownTables(docContent: string): MarkdownTableData[] {
+  // Matches CRLF or LF newline sequences
   const lines = docContent.split(/\r?\n/);
   const tables: MarkdownTableData[] = [];
 
@@ -136,6 +143,9 @@ export function parseMarkdownTables(docContent: string): MarkdownTableData[] {
       const headers = splitTableRow(line);
       const delimiterLine = lines[i + 1];
       const alignments = splitTableRow(delimiterLine);
+      while (alignments.length < headers.length) {
+        alignments.push("---");
+      }
 
       const rows: MarkdownTableRow[] = [];
       let currentLineIdx = i + 2;
@@ -182,9 +192,6 @@ export function parseMarkdownTables(docContent: string): MarkdownTableData[] {
   return tables;
 }
 
-/**
- * Serializes a MarkdownTableData object back to aligned Markdown table text.
- */
 export function serializeMarkdownTable(table: MarkdownTableData): string {
   const { headers, alignments, rows } = table;
 
@@ -231,7 +238,21 @@ export function serializeMarkdownTable(table: MarkdownTableData): string {
     return (
       "| " +
       headers
-        .map((_, i) => escapeTableCell(row.cells[i] || "").padEnd(colWidths[i], " "))
+        .map((_, i) => {
+          const val = escapeTableCell(row.cells[i] || "");
+          const align = alignments[i] || "---";
+          const isCenter = align.startsWith(":") && align.endsWith(":");
+          const isRight = !isCenter && align.endsWith(":");
+          if (isRight) {
+            return val.padStart(colWidths[i], " ");
+          } else if (isCenter) {
+            const padTotal = Math.max(0, colWidths[i] - val.length);
+            const padLeft = Math.floor(padTotal / 2);
+            const padRight = padTotal - padLeft;
+            return " ".repeat(padLeft) + val + " ".repeat(padRight);
+          }
+          return val.padEnd(colWidths[i], " ");
+        })
         .join(" | ") +
       " |"
     );
@@ -240,9 +261,6 @@ export function serializeMarkdownTable(table: MarkdownTableData): string {
   return [headerStr, delimiterStr, ...rowStrings].join("\n");
 }
 
-/**
- * Finds the target table by line, headers or index with reliable fallbacks.
- */
 export function findTargetTable(
   tables: MarkdownTableData[],
   startLine: number,
@@ -273,15 +291,10 @@ export function findTargetTable(
   return tables[0];
 }
 
-/**
- * Mutates a target table within a markdown document text and returns the updated document text.
- * The mutator callback receives the resolved table and can modify it in place.
- * Returning false from the callback cancels the mutation and preserves original document content.
- */
 export function mutateTableInDocument(
   docContent: string,
   startLine: number,
-  mutator: (table: MarkdownTableData) => boolean | void,
+  mutator: (table: MarkdownTableData) => boolean,
   headers?: string[],
   tableIndex?: number
 ): string {
@@ -289,12 +302,12 @@ export function mutateTableInDocument(
   const targetTable = findTargetTable(tables, startLine, headers, tableIndex);
   if (!targetTable) return docContent;
 
-  const result = mutator(targetTable);
-  if (result === false) return docContent;
+  if (!mutator(targetTable)) return docContent;
 
   const isCrlf = docContent.includes("\r\n");
   const eol = isCrlf ? "\r\n" : "\n";
   const newTableLines = serializeMarkdownTable(targetTable).split("\n");
+  // Matches CRLF or LF newline sequences
   const lines = docContent.split(/\r?\n/);
   lines.splice(
     targetTable.startLine,
@@ -304,9 +317,6 @@ export function mutateTableInDocument(
   return lines.join(eol);
 }
 
-/**
- * Replaces a specific cell in markdown document text and returns the new full document text.
- */
 export function updateCellInDocument(
   docContent: string,
   startLine: number,
@@ -322,44 +332,47 @@ export function updateCellInDocument(
     (table) => {
       if (!table.rows[rowIndex]) return false;
       table.rows[rowIndex].cells[colIndex] = newCellValue;
+      return true;
     },
     headers,
     tableIndex
   );
 }
 
-/**
- * Adds a new row to the markdown table in the document.
- */
 export function addRowToDocument(
   docContent: string,
   startLine: number,
   initialCells?: string[],
   headers?: string[],
-  tableIndex?: number
+  tableIndex?: number,
+  atIndex?: number
 ): string {
   return mutateTableInDocument(
     docContent,
     startLine,
     (table) => {
       const colCount = table.headers.length;
-      const newCells = initialCells ? [...initialCells] : new Array(colCount).fill("");
+      const newCells: string[] = initialCells ? [...initialCells] : new Array<string>(colCount).fill("");
       while (newCells.length < colCount) newCells.push("");
 
-      table.rows.push({
-        rowIndex: table.rows.length,
+      const insertIdx =
+        atIndex !== undefined && atIndex >= 0 && atIndex <= table.rows.length
+          ? atIndex
+          : table.rows.length;
+
+      table.rows.splice(insertIdx, 0, {
+        rowIndex: insertIdx,
         rawLine: "",
         cells: newCells,
       });
+      table.rows.forEach((row, idx) => (row.rowIndex = idx));
+      return true;
     },
     headers,
     tableIndex
   );
 }
 
-/**
- * Deletes a row from the markdown table in the document.
- */
 export function deleteRowFromDocument(
   docContent: string,
   startLine: number,
@@ -374,15 +387,13 @@ export function deleteRowFromDocument(
       if (rowIndex < 0 || rowIndex >= table.rows.length) return false;
       table.rows.splice(rowIndex, 1);
       table.rows.forEach((r, idx) => (r.rowIndex = idx));
+      return true;
     },
     headers,
     tableIndex
   );
 }
 
-/**
- * Adds a new column to the markdown table in the document.
- */
 export function addColumnToDocument(
   docContent: string,
   startLine: number,
@@ -401,15 +412,13 @@ export function addColumnToDocument(
       table.rows.forEach((row) => {
         row.cells.splice(insertIdx, 0, "");
       });
+      return true;
     },
     headers,
     tableIndex
   );
 }
 
-/**
- * Renames a column in the markdown table in the document.
- */
 export function renameColumnInDocument(
   docContent: string,
   startLine: number,
@@ -424,15 +433,13 @@ export function renameColumnInDocument(
     (table) => {
       if (colIndex < 0 || colIndex >= table.headers.length) return false;
       table.headers[colIndex] = newName;
+      return true;
     },
     headers,
     tableIndex
   );
 }
 
-/**
- * Deletes a column from the markdown table in the document.
- */
 export function deleteColumnFromDocument(
   docContent: string,
   startLine: number,
@@ -450,15 +457,13 @@ export function deleteColumnFromDocument(
       table.rows.forEach((row) => {
         row.cells.splice(colIndex, 1);
       });
+      return true;
     },
     headers,
     tableIndex
   );
 }
 
-/**
- * Reorders a row from fromIndex to toIndex in the document table.
- */
 export function reorderRowInDocument(
   docContent: string,
   startLine: number,
@@ -482,15 +487,13 @@ export function reorderRowInDocument(
       const [movedRow] = table.rows.splice(fromIndex, 1);
       table.rows.splice(toIndex, 0, movedRow);
       table.rows.forEach((r, idx) => (r.rowIndex = idx));
+      return true;
     },
     headers,
     tableIndex
   );
 }
 
-/**
- * Reorders a column from fromIndex to toIndex in the document table.
- */
 export function reorderColumnInDocument(
   docContent: string,
   startLine: number,
@@ -521,21 +524,47 @@ export function reorderColumnInDocument(
         const [movedCell] = r.cells.splice(fromIndex, 1);
         r.cells.splice(toIndex, 0, movedCell);
       });
+      return true;
     },
     headers,
     tableIndex
   );
 }
 
-/**
- * Exports markdown table data to CSV format.
- */
+export function changeColumnAlignmentInDocument(
+  docContent: string,
+  startLine: number,
+  colIndex: number,
+  newAlignment: ColumnAlignment,
+  headers?: string[],
+  tableIndex?: number
+): string {
+  return mutateTableInDocument(
+    docContent,
+    startLine,
+    (table) => {
+      if (colIndex < 0 || colIndex >= table.headers.length) return false;
+      if (!table.alignments) {
+        table.alignments = new Array<string>(table.headers.length).fill("---");
+      }
+      while (table.alignments.length < table.headers.length) {
+        table.alignments.push("---");
+      }
+      table.alignments[colIndex] = formatColumnAlignmentToken(newAlignment);
+      return true;
+    },
+    headers,
+    tableIndex
+  );
+}
+
 export function exportTableToCSV(
   tableData: MarkdownTableData,
   hiddenColumns: number[] = []
 ): string {
   const escapeCSV = (val: string) => {
     if (val.includes(",") || val.includes('"') || val.includes("\n")) {
+      // Escapes double quotes by doubling them for CSV format
       return `"${val.replace(/"/g, '""')}"`;
     }
     return val;
@@ -552,4 +581,3 @@ export function exportTableToCSV(
 
   return [headers, ...rows].join("\n");
 }
-

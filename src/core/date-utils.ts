@@ -15,9 +15,6 @@ export const DATE_FORMAT_OPTIONS: DateFormatDescriptor[] = [
   { format: "DD-MM-YYYY", label: "DD-MM-YYYY", example: "04-09-2026" },
 ];
 
-/**
- * Formats a Date object into a string based on the chosen DateFormatOption.
- */
 export function formatDateByOption(
   d: Date,
   format: DateFormatOption = "YYYY-MM-DD"
@@ -44,10 +41,6 @@ export function formatDateByOption(
   }
 }
 
-/**
- * Parses a date string into a Date object according to the DateFormatOption.
- * Falls back to standard Date.parse if explicit format parsing does not match.
- */
 export function parseDateByOption(
   str: string,
   format: DateFormatOption = "YYYY-MM-DD"
@@ -62,6 +55,7 @@ export function parseDateByOption(
   const delimiter = format.includes("/") ? "/" : format.includes(".") ? "." : "-";
   if (s.includes(delimiter)) {
     const parts = s.split(delimiter);
+    // Matches segments containing one or more digits only
     if (
       parts.length === 3 &&
       /^\d+$/.test(parts[0]) &&
@@ -98,21 +92,46 @@ export function parseDateByOption(
     !isNaN(y) &&
     m !== undefined &&
     !isNaN(m) &&
+    m >= 0 &&
+    m <= 11 &&
     d !== undefined &&
-    !isNaN(d)
+    !isNaN(d) &&
+    d >= 1 &&
+    d <= 31
   ) {
     const dateObj = new Date(y, m, d);
-    if (!isNaN(dateObj.getTime())) return dateObj;
+    if (!isNaN(dateObj.getTime()) && dateObj.getDate() === d) return dateObj;
   }
 
-  const fallback = Date.parse(s);
-  return !isNaN(fallback) ? new Date(fallback) : null;
+  if (s.includes("T")) {
+    const fallback = Date.parse(s);
+    return !isNaN(fallback) ? new Date(fallback) : null;
+  }
+
+  return null;
 }
 
-/**
- * Compares two date strings based on DateFormatOption.
- * Returns negative if a < b, positive if a > b, 0 if equal.
- */
+export function parseAnyDate(
+  str: string,
+  preferredFormat?: DateFormatOption
+): Date | null {
+  if (!str || !str.trim()) return null;
+  const s = str.trim();
+
+  if (preferredFormat) {
+    const direct = parseDateByOption(s, preferredFormat);
+    if (direct) return direct;
+  }
+
+  for (const option of DATE_FORMAT_OPTIONS) {
+    if (option.format === preferredFormat) continue;
+    const candidate = parseDateByOption(s, option.format);
+    if (candidate) return candidate;
+  }
+
+  return null;
+}
+
 export function compareDateStrings(
   valA: string,
   valB: string,
