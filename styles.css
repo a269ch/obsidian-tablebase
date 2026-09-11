@@ -1057,6 +1057,25 @@ input[type="text"].ms-filter-value-input:focus {
   font-variant-numeric: tabular-nums;
 }
 
+.ms-cell-link {
+  color: var(--link-color, var(--text-accent));
+  text-decoration: var(--link-decoration, underline);
+  cursor: pointer;
+}
+
+.ms-cell-link:hover {
+  color: var(--link-color-hover, var(--text-accent-hover));
+  text-decoration: underline;
+}
+
+.ms-cell-link.internal-link {
+  color: var(--link-color, var(--text-accent));
+}
+
+.ms-cell-link.external-link {
+  color: var(--link-external-color, var(--text-accent));
+}
+
 .ms-inline-cell-input,
 .ms-db-grid-table .ms-db-td input.ms-inline-cell-input,
 .theme-dark .ms-db-grid-table .ms-db-td input.ms-inline-cell-input,
@@ -2378,4 +2397,27 @@ input[type="text"].ms-modal-name-input.is-invalid {
   opacity: 1;
   visibility: visible;
 }
+
+@media print {
+  body .ms-enhanced-table-wrapper > table.ms-table-hidden {
+    display: table;
+  }
+
+  body .ms-enhanced-table-wrapper > .ms-notion-database-container,
+  body .ms-enhanced-table-wrapper > .ms-kanban-container {
+    display: none;
+  }
+
+  body .ms-notion-database-container .ms-db-toolbar,
+  body .ms-notion-database-container .ms-floating-row-handle,
+  body .ms-notion-database-container .ms-row-drag-handle,
+  body .ms-notion-database-container .ms-db-new-row-button,
+  body .ms-notion-database-container .ms-col-drag-handle,
+  body .ms-notion-database-container .ms-col-menu-trigger,
+  body .ms-notion-database-container .ms-add-col-btn,
+  body .ms-notion-database-container .ms-column-resize-handle {
+    display: none;
+  }
+}
+
 

@@ -82,7 +82,10 @@ Create a normal table in any note:
 | Core refactoring | Done | Dev | 2026-09-07 | [x] |
 ```
 
-Switch to **Reading View** or **Live Preview** — TableBase automatically renders your table as an interactive database.
+Switch to **Reading View** — TableBase automatically transforms standard Markdown tables into interactive databases.
+
+> [!NOTE]
+> Standard Markdown tables are rendered as TableBase databases in **Reading View**. Direct Live Preview support for standard tables is in active development. For an interactive view directly inside Live Preview today, you can also use an optional ```` ```tablebase ```` code block.
 
 ### 2. Explicit Code Block (Optional)
 You can also use a dedicated ```` ```tablebase ```` code block:

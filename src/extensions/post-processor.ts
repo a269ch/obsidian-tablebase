@@ -2,6 +2,7 @@ import { MarkdownPostProcessorContext } from "obsidian";
 import { TableViewController } from "../services/table-view-controller";
 import { TableViewRegistry } from "../services/table-view-registry";
 import { MarkdownTableData, MarkdownTableRow } from "../types";
+import { isPrintMode } from "./print-mode";
 import { TableRenderChild } from "./table-render-child";
 
 const SKIP_CONTAINER_CLASSES = ["ms-notion-database-container", "ms-kanban-container"];
@@ -16,6 +17,10 @@ export class TablePostProcessor {
   }
 
   public process(el: HTMLElement, ctx: MarkdownPostProcessorContext): void {
+    if (isPrintMode(el)) {
+      return;
+    }
+
     if (SKIP_CONTAINER_CLASSES.some((cls) => el.classList.contains(cls))) {
       return;
     }
@@ -82,7 +87,6 @@ export class TablePostProcessor {
 
     const viewEl = view.getElement();
     tableEl.addClass("ms-table-hidden");
-    tableEl.setCssStyles({ display: "none" });
     tableEl.parentNode?.insertBefore(viewEl, tableEl);
 
     const parentEl = viewEl.parentElement;

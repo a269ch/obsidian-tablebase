@@ -95,7 +95,7 @@ export class TableViewController {
       currentSource = serializeMarkdownTable(tableData);
     };
 
-    return this.createView(tableData, persist);
+    return this.createView(tableData, persist, sourcePath);
   }
 
   public createInlineTableView(params: InlineTableViewParams): NotionTableView {
@@ -112,12 +112,13 @@ export class TableViewController {
       await this.syncService.syncInlineTable(sourcePath, transform);
     };
 
-    return this.createView(tableData, persist);
+    return this.createView(tableData, persist, sourcePath);
   }
 
   private createView(
     tableData: MarkdownTableData,
-    persist: PersistOperation
+    persist: PersistOperation,
+    sourcePath: string
   ): NotionTableView {
     const settings = this.settingsService.getSettings();
     const columns = this.stateManager.analyzeColumns(tableData, settings);
@@ -250,6 +251,7 @@ export class TableViewController {
 
     view = new NotionTableView({
       app: this.app,
+      sourcePath,
       tableData,
       columns,
       filterState,

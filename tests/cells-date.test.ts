@@ -77,6 +77,7 @@ function createContext(columns: TableColumn[], rows: MarkdownTableRow[]) {
 
   const ctx: TableViewContext = {
     app: {} as App,
+    sourcePath: "notes/test.md",
     actions,
     selection: new SelectionModel(),
     registry: new DisposableRegistry(),
@@ -195,5 +196,86 @@ describe("CellRenderer date cells", () => {
     renderer.render(td, row, unformattedCol, 0);
 
     expect(td.querySelector(".ms-date-text")?.textContent).toBe("15.09.2026");
+  });
+
+  it("should render links in text cells and open them on click", () => {
+    const textCol: TableColumn = { name: "Resource", index: 0, type: "text" };
+    const row: MarkdownTableRow = {
+      rowIndex: 0,
+      rawLine: "",
+      cells: ["Check [Obsidian](https://obsidian.md) and https://google.com or [[Daily Note]]"],
+    };
+    const { ctx, containerEl } = createContext([textCol], [row]);
+    const openLinkTextMock = vi.fn();
+    (ctx.app as unknown as Record<string, unknown>).workspace = {
+      openLinkText: openLinkTextMock,
+    };
+
+    const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    const renderer = new CellRenderer(ctx);
+
+    const td = containerEl.createEl("td", { cls: "ms-db-td" });
+    renderer.render(td, row, textCol, 0);
+
+    const extLinks = td.querySelectorAll<HTMLAnchorElement>("a.external-link");
+    expect(extLinks.length).toBe(2);
+    expect(extLinks[0].textContent).toBe("Obsidian");
+    expect(extLinks[0].getAttribute("href")).toBe("https://obsidian.md");
+    expect(extLinks[1].textContent).toBe("https://google.com");
+
+    extLinks[0].dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(windowOpenSpy).toHaveBeenCalledWith("https://obsidian.md", "_blank");
+
+    const intLink = td.querySelector<HTMLAnchorElement>("a.internal-link");
+    expect(intLink).not.toBeNull();
+    expect(intLink?.textContent).toBe("Daily Note");
+
+    intLink?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(openLinkTextMock).toHaveBeenCalledWith("Daily Note", "notes/test.md", false);
+
+    windowOpenSpy.mockRestore();
+  });
+
+  it("should preserve raw link markdown during inline editing on double click", () => {
+    const textCol: TableColumn = { name: "Resource", index: 0, type: "text" };
+    const rawVal = "Visit [Google](https://google.com)";
+    const row: MarkdownTableRow = { rowIndex: 0, rawLine: "", cells: [rawVal] };
+    const { ctx, containerEl } = createContext([textCol], [row]);
+    const renderer = new CellRenderer(ctx);
+
+    const td = containerEl.createEl("td", { cls: "ms-db-td" });
+    renderer.render(td, row, textCol, 0);
+
+    td.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    expect(renderer.isEditing).toBe(true);
+
+    const input = td.querySelector<HTMLInputElement>("input.ms-inline-cell-input");
+    expect(input).not.toBeNull();
+    expect(input?.value).toBe(rawVal);
+  });
+
+  it("should initialize inline editing with initialChar when typed on focused cell", () => {
+    const textCol: TableColumn = { name: "Note", index: 0, type: "text" };
+    const row: MarkdownTableRow = { rowIndex: 0, rawLine: "", cells: ["Original"] };
+    const { ctx, actions, containerEl } = createContext([textCol], [row]);
+    const renderer = new CellRenderer(ctx);
+
+    const td = containerEl.createEl("td", { cls: "ms-db-td" });
+    renderer.render(td, row, textCol, 0);
+
+    renderer.startInlineEditing(td, 0, 0, "Original", "F");
+    expect(renderer.isEditing).toBe(true);
+
+    const input = td.querySelector<HTMLInputElement>("input.ms-inline-cell-input");
+    expect(input).not.toBeNull();
+    expect(input?.value).toBe("F");
+
+    if (input) {
+      input.value = "Fresh start";
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    }
+
+    expect(actions.onCellUpdate).toHaveBeenCalledWith(0, 0, "Fresh start");
+    expect(renderer.isEditing).toBe(false);
   });
 });

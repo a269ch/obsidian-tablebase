@@ -99,6 +99,7 @@ export class KeyboardController {
     const td = this.findCellElement(focused.row, focused.col);
     if (!td) return;
 
+    e.preventDefault();
     this.cells.startInlineEditing(td, focused.row, focused.col, "", e.key);
   }
 

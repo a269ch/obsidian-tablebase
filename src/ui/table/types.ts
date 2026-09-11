@@ -48,6 +48,7 @@ export type BoardViewActions = Pick<
 
 export interface TableViewOptions {
   app: App;
+  sourcePath: string;
   tableData: MarkdownTableData;
   columns: TableColumn[];
   filterState: TableFilterState;
@@ -57,6 +58,7 @@ export interface TableViewOptions {
 
 export interface TableViewContext {
   readonly app: App;
+  readonly sourcePath: string;
   readonly actions: TableViewActions;
   readonly selection: SelectionModel;
   readonly registry: DisposableRegistry;

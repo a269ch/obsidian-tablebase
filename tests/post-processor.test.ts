@@ -179,7 +179,7 @@ describe("TablePostProcessor date columns", () => {
 
     const original = wrapper.querySelector<HTMLElement>('table[data-ms-enhanced="true"]');
     expect(original).not.toBeNull();
-    expect(original?.style.display).toBe("none");
+    expect(original?.classList.contains("ms-table-hidden")).toBe(true);
   });
 
   it("should open the calendar on an empty cell of a freshly created date column", () => {
@@ -400,5 +400,60 @@ describe("TablePostProcessor date columns", () => {
     processor.process(subsequentWrapper, ctx);
 
     expect(subsequentWrapper.querySelector(".ms-date-text")?.textContent).toBe("05.10.2026");
+  });
+
+  it("should skip table enhancement during print or PDF export", () => {
+    const { processor, ctx } = createProcessor();
+
+    // 1. Element inside .print container
+    const printContainer = document.createElement("div");
+    printContainer.addClass("print");
+    const tableWrapper1 = buildRenderedTable(["Col A"], [["Val 1"]]);
+    printContainer.appendChild(tableWrapper1);
+    document.body.appendChild(printContainer);
+
+    processor.process(tableWrapper1, ctx);
+    expect(tableWrapper1.querySelector(".ms-notion-database-container")).toBeNull();
+    expect(tableWrapper1.querySelector("table")?.classList.contains("ms-table-hidden")).toBe(false);
+
+    // 2. Element inside .pdf-export container
+    const pdfContainer = document.createElement("div");
+    pdfContainer.addClass("pdf-export");
+    const tableWrapper2 = buildRenderedTable(["Col B"], [["Val 2"]]);
+    pdfContainer.appendChild(tableWrapper2);
+    document.body.appendChild(pdfContainer);
+
+    processor.process(tableWrapper2, ctx);
+    expect(tableWrapper2.querySelector(".ms-notion-database-container")).toBeNull();
+    expect(tableWrapper2.querySelector("table")?.classList.contains("ms-table-hidden")).toBe(false);
+
+    // 3. Document body has .print class
+    document.body.addClass("print");
+    const tableWrapper3 = buildRenderedTable(["Col C"], [["Val 3"]]);
+    processor.process(tableWrapper3, ctx);
+    expect(tableWrapper3.querySelector(".ms-notion-database-container")).toBeNull();
+    expect(tableWrapper3.querySelector("table")?.classList.contains("ms-table-hidden")).toBe(false);
+    document.body.removeClass("print");
+
+    // 4. matchMedia("print").matches is true
+    const matchMediaSpy = vi.spyOn(window, "matchMedia").mockImplementation((query: string) => {
+      return {
+        matches: query === "print",
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      } as unknown as MediaQueryList;
+    });
+
+    const tableWrapper4 = buildRenderedTable(["Col D"], [["Val 4"]]);
+    processor.process(tableWrapper4, ctx);
+    expect(tableWrapper4.querySelector(".ms-notion-database-container")).toBeNull();
+    expect(tableWrapper4.querySelector("table")?.classList.contains("ms-table-hidden")).toBe(false);
+
+    matchMediaSpy.mockRestore();
   });
 });
