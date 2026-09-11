@@ -47,6 +47,7 @@ function createContext(tableData: MarkdownTableData, columns: TableColumn[]) {
   const actions = createActions();
   const ctx: TableViewContext = {
     app: {} as App,
+    sourcePath: "notes/test.md",
     actions,
     selection: new SelectionModel(),
     registry: new DisposableRegistry(),

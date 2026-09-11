@@ -84,6 +84,7 @@ describe("KanbanView", () => {
 
     const kanban = new KanbanView({
       app: {} as App,
+      sourcePath: "notes/test.md",
       tableData: sampleTableData,
       columns: sampleColumns,
       filterState: { ...defaultFilterState },
@@ -115,6 +116,7 @@ describe("KanbanView", () => {
 
     const kanban = new KanbanView({
       app: {} as App,
+      sourcePath: "notes/test.md",
       tableData: sampleTableData,
       columns: sampleColumns,
       filterState: { ...defaultFilterState },
@@ -136,6 +138,7 @@ describe("KanbanView", () => {
 
     const kanban = new KanbanView({
       app: {} as App,
+      sourcePath: "notes/test.md",
       tableData: sampleTableData,
       columns: sampleColumns,
       filterState: { ...defaultFilterState },
@@ -163,6 +166,7 @@ describe("KanbanView", () => {
 
     const kanban = new KanbanView({
       app: {} as App,
+      sourcePath: "notes/test.md",
       tableData: sampleTableData,
       columns: sampleColumns,
       filterState: { ...defaultFilterState },
@@ -187,6 +191,7 @@ describe("KanbanView", () => {
 
     const kanban = new KanbanView({
       app: {} as App,
+      sourcePath: "notes/test.md",
       tableData: sampleTableData,
       columns: sampleColumns,
       filterState: { ...defaultFilterState },
@@ -218,6 +223,7 @@ describe("KanbanView", () => {
 
     const kanban = new KanbanView({
       app: {} as App,
+      sourcePath: "notes/test.md",
       tableData: sampleTableData,
       columns: sampleColumns,
       filterState: { ...defaultFilterState },
@@ -234,5 +240,44 @@ describe("KanbanView", () => {
 
     checkboxBadges[0].click();
     expect(actions.onCellUpdate).toHaveBeenCalledWith(2, 4, "[x]");
+  });
+
+  it("should render clickable links in kanban card titles and handle click events", () => {
+    const actions = createActions();
+    const onSwitchView = vi.fn();
+    const tableDataWithLinks: MarkdownTableData = {
+      ...sampleTableData,
+      rows: [
+        {
+          rowIndex: 0,
+          cells: ["Visit [GitHub](https://github.com)", "Todo", "High", "2026-09-10", "[ ]"],
+          rawLine: "",
+        },
+      ],
+    };
+
+    const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+
+    const kanban = new KanbanView({
+      app: {} as App,
+      sourcePath: "notes/test.md",
+      tableData: tableDataWithLinks,
+      columns: sampleColumns,
+      filterState: { ...defaultFilterState },
+      settings: { ...DEFAULT_SETTINGS },
+      actions,
+      onSwitchView,
+    });
+
+    const el = kanban.getElement();
+    const linkEl = el.querySelector<HTMLAnchorElement>(".ms-kanban-card-title a.external-link");
+    expect(linkEl).not.toBeNull();
+    expect(linkEl?.textContent).toBe("GitHub");
+    expect(linkEl?.getAttribute("href")).toBe("https://github.com");
+
+    linkEl?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(windowOpenSpy).toHaveBeenCalledWith("https://github.com", "_blank");
+
+    windowOpenSpy.mockRestore();
   });
 });

@@ -24,6 +24,7 @@ import { TableViewActions, TableViewContext, TableViewOptions } from "./types";
 
 export class NotionTableView implements Disposable, TableViewContext {
   public readonly app: App;
+  public readonly sourcePath: string;
   public readonly actions: TableViewActions;
   public readonly selection = new SelectionModel();
   public readonly registry = new DisposableRegistry();
@@ -44,6 +45,7 @@ export class NotionTableView implements Disposable, TableViewContext {
   constructor(options: TableViewOptions) {
     this.options = options;
     this.app = options.app;
+    this.sourcePath = options.sourcePath;
     this.actions = options.actions;
 
     this.options.filterState.viewType ??= "table";
@@ -181,6 +183,7 @@ export class NotionTableView implements Disposable, TableViewContext {
   private renderBoard(): void {
     const kanban = new KanbanView({
       app: this.app,
+      sourcePath: this.sourcePath,
       tableData: this.tableData,
       columns: this.columns,
       filterState: this.filterState,

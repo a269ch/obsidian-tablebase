@@ -4,6 +4,7 @@ import { parseCellTags } from "../../core/tag-parser";
 import { ColumnAlignment, MarkdownTableRow, TableColumn } from "../../types";
 import { appendIcon } from "../../utils/dom";
 import { attachStrictNumericInputHandlers, sanitizeNumericCellValue } from "../../utils/input";
+import { renderTextWithLinks } from "../../utils/link-renderer";
 import { ICON_TYPE_DATE } from "../icons";
 import { DatePickerPopover } from "../modals/date-picker-popover";
 import { SingleSelectPopover } from "../modals/single-select-popover";
@@ -196,7 +197,27 @@ export class CellRenderer {
     const wrapper = td.createDiv({
       cls: `ms-cell-text-wrapper ${isNumber ? "is-number" : ""}`,
     });
-    wrapper.textContent = rawValue;
+
+    if (isNumber) {
+      wrapper.textContent = rawValue;
+    } else {
+      renderTextWithLinks(wrapper, rawValue, {
+        onExternalClick: (url, e) => {
+          e.stopPropagation();
+          this.focusCell(row.rowIndex, colIndex);
+          if (typeof window !== "undefined" && url) {
+            window.open(url, "_blank");
+          }
+        },
+        onInternalClick: (path, e) => {
+          e.stopPropagation();
+          this.focusCell(row.rowIndex, colIndex);
+          if (path && this.ctx.app?.workspace) {
+            void this.ctx.app.workspace.openLinkText?.(path, this.ctx.sourcePath || "", false);
+          }
+        },
+      });
+    }
 
     td.addEventListener("click", () => this.focusCell(row.rowIndex, colIndex));
     td.addEventListener("dblclick", () => {

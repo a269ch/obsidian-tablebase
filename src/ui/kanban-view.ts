@@ -14,6 +14,7 @@ import {
 } from "../types";
 import { appendIcon, appendIconLabel } from "../utils/dom";
 import { attachStrictNumericInputHandlers, sanitizeNumericCellValue } from "../utils/input";
+import { renderTextWithLinks } from "../utils/link-renderer";
 import {
   ICON_CHECK_SQUARE,
   ICON_DUPLICATE,
@@ -35,6 +36,7 @@ import { BoardViewActions } from "./table/types";
 
 export interface KanbanViewOptions {
   app: App;
+  sourcePath: string;
   tableData: MarkdownTableData;
   columns: TableColumn[];
   filterState: TableFilterState;
@@ -318,7 +320,20 @@ export class KanbanView {
 
     const titleEl = card.createDiv({
       cls: "ms-kanban-card-title",
-      text: row.cells[0] || "Untitled",
+    });
+    renderTextWithLinks(titleEl, row.cells[0] || "Untitled", {
+      onExternalClick: (url, e) => {
+        e.stopPropagation();
+        if (typeof window !== "undefined" && url) {
+          window.open(url, "_blank");
+        }
+      },
+      onInternalClick: (path, e) => {
+        e.stopPropagation();
+        if (path && this.options.app?.workspace) {
+          void this.options.app.workspace.openLinkText?.(path, this.options.sourcePath || "", false);
+        }
+      },
     });
 
     titleEl.addEventListener("dblclick", (e) => {

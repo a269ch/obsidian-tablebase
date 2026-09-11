@@ -1,6 +1,6 @@
 {
   "name": "obsidian-tablebase",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Turn standard Markdown tables into interactive Notion-like databases: Kanban board view, multi-select tags, date pickers, calculations, and advanced filters",
   "main": "main.js",
   "scripts": {
