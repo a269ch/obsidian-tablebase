@@ -8,10 +8,10 @@
   --ms-bg-subtle: var(--background-secondary, #f7f6f3);
   --ms-text-muted: var(--text-muted, #787774);
   --ms-blue-accent: var(--interactive-accent, #2383e2);
-  --ms-focus-ring: #2383e2;
   --ms-focus-col-bg: rgba(35, 131, 226, 0.08);
   --ms-focus-row-bg: rgba(35, 131, 226, 0.09);
   --ms-focus-th-bg: rgba(35, 131, 226, 0.14);
+  --ms-focus-cell-bg: rgba(35, 131, 226, 0.16);
   --ms-card-bg: var(--background-primary, #ffffff);
   --ms-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
@@ -24,12 +24,14 @@
   --ms-focus-col-bg: rgba(46, 170, 220, 0.12);
   --ms-focus-row-bg: rgba(46, 170, 220, 0.12);
   --ms-focus-th-bg: rgba(46, 170, 220, 0.20);
+  --ms-focus-cell-bg: rgba(46, 170, 220, 0.24);
   --ms-card-bg: var(--background-secondary, #202020);
   --ms-card-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
 .ms-notion-database-container {
-  margin: 1.25rem 0;
+  margin: 1.25rem 0 1.25rem 26px;
+  max-width: calc(100% - 26px);
   border: 1px solid var(--ms-border);
   border-radius: 8px;
   background-color: var(--background-primary);
@@ -39,6 +41,7 @@
   outline: none;
   overflow: visible;
   position: relative;
+  box-sizing: border-box;
 }
 
 .ms-notion-kanban-container {
@@ -499,6 +502,15 @@ input[type="text"].ms-filter-value-input:focus {
   overflow: visible;
 }
 
+.ms-enhanced-table-wrapper > .ms-notion-database-container,
+.el-table.ms-enhanced-table-wrapper > .ms-notion-database-container,
+.markdown-rendered .ms-enhanced-table-wrapper > .ms-notion-database-container {
+  margin-top: 0;
+  margin-bottom: 0;
+  margin-left: 26px;
+  max-width: calc(100% - 26px);
+}
+
 .ms-table-hidden {
   display: none;
 }
@@ -512,12 +524,12 @@ input[type="text"].ms-filter-value-input:focus {
 
 .ms-floating-row-handle {
   position: absolute;
-  left: -22px;
+  left: -24px;
   top: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
+  width: 24px;
   height: 24px;
   opacity: 0;
   pointer-events: none;
@@ -526,6 +538,16 @@ input[type="text"].ms-filter-value-input:focus {
   user-select: none;
   -webkit-user-select: none;
   box-sizing: border-box;
+}
+
+.ms-floating-row-handle::after {
+  content: "";
+  position: absolute;
+  left: 100%;
+  top: -4px;
+  bottom: -4px;
+  width: 16px;
+  pointer-events: auto;
 }
 
 .ms-floating-row-handle.is-visible,
@@ -593,6 +615,116 @@ input[type="text"].ms-filter-value-input:focus {
   margin: 0;
 }
 
+.markdown-rendered .ms-notion-database-container table.ms-db-grid-table,
+.cm-html-embed .ms-notion-database-container table.ms-db-grid-table,
+.markdown-source-view .ms-notion-database-container table.ms-db-grid-table,
+.ms-enhanced-table-wrapper .ms-notion-database-container table.ms-db-grid-table,
+.ms-notion-database-container table.ms-db-grid-table {
+  margin: 0;
+  margin-block-start: 0;
+  margin-block-end: 0;
+  padding: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: none;
+  line-height: normal;
+  word-break: normal;
+}
+
+.markdown-rendered .ms-notion-database-container .ms-db-grid-table thead,
+.markdown-rendered .ms-notion-database-container .ms-db-grid-table tbody,
+.markdown-rendered .ms-notion-database-container .ms-db-grid-table tfoot,
+.cm-html-embed .ms-notion-database-container .ms-db-grid-table thead,
+.cm-html-embed .ms-notion-database-container .ms-db-grid-table tbody,
+.cm-html-embed .ms-notion-database-container .ms-db-grid-table tfoot,
+.markdown-source-view .ms-notion-database-container .ms-db-grid-table thead,
+.markdown-source-view .ms-notion-database-container .ms-db-grid-table tbody,
+.markdown-source-view .ms-notion-database-container .ms-db-grid-table tfoot {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.markdown-rendered .ms-notion-database-container .ms-db-grid-table thead tr,
+.markdown-rendered .ms-notion-database-container .ms-db-grid-table tbody tr,
+.cm-html-embed .ms-notion-database-container .ms-db-grid-table thead tr,
+.cm-html-embed .ms-notion-database-container .ms-db-grid-table tbody tr,
+.markdown-source-view .ms-notion-database-container .ms-db-grid-table thead tr,
+.markdown-source-view .ms-notion-database-container .ms-db-grid-table tbody tr {
+  background-color: transparent;
+  border: none;
+  margin: 0;
+}
+
+.markdown-rendered .ms-notion-database-container .ms-db-grid-table thead tr:hover,
+.markdown-rendered .ms-notion-database-container .ms-db-grid-table tbody tr:hover,
+.cm-html-embed .ms-notion-database-container .ms-db-grid-table thead tr:hover,
+.cm-html-embed .ms-notion-database-container .ms-db-grid-table tbody tr:hover,
+.markdown-source-view .ms-notion-database-container .ms-db-grid-table thead tr:hover,
+.markdown-source-view .ms-notion-database-container .ms-db-grid-table tbody tr:hover {
+  background-color: transparent;
+}
+
+.markdown-rendered .ms-notion-database-container .ms-db-grid-table th,
+.markdown-rendered .ms-notion-database-container .ms-db-grid-table td,
+.cm-html-embed .ms-notion-database-container .ms-db-grid-table th,
+.cm-html-embed .ms-notion-database-container .ms-db-grid-table td,
+.markdown-source-view .ms-notion-database-container .ms-db-grid-table th,
+.markdown-source-view .ms-notion-database-container .ms-db-grid-table td {
+  border-top: none;
+  border-left: none;
+  white-space: normal;
+}
+
+.markdown-rendered .ms-notion-database-container .ms-db-grid-table thead > tr > th,
+.markdown-rendered .ms-notion-database-container .ms-db-grid-table tbody > tr > td,
+.cm-html-embed .ms-notion-database-container .ms-db-grid-table thead > tr > th,
+.cm-html-embed .ms-notion-database-container .ms-db-grid-table tbody > tr > td,
+.markdown-source-view .ms-notion-database-container .ms-db-grid-table thead > tr > th,
+.markdown-source-view .ms-notion-database-container .ms-db-grid-table tbody > tr > td {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.markdown-rendered .ms-notion-database-container .ms-db-grid-table th.ms-db-th,
+.markdown-rendered .ms-notion-database-container .ms-db-grid-table th.ms-db-th-add-col,
+.cm-html-embed .ms-notion-database-container .ms-db-grid-table th.ms-db-th,
+.cm-html-embed .ms-notion-database-container .ms-db-grid-table th.ms-db-th-add-col,
+.markdown-source-view .ms-notion-database-container .ms-db-grid-table th.ms-db-th,
+.markdown-source-view .ms-notion-database-container .ms-db-grid-table th.ms-db-th-add-col {
+  padding: 0;
+}
+
+.markdown-rendered .ms-notion-database-container .ms-db-grid-table td.ms-db-td,
+.cm-html-embed .ms-notion-database-container .ms-db-grid-table td.ms-db-td,
+.markdown-source-view .ms-notion-database-container .ms-db-grid-table td.ms-db-td {
+  padding: 6px 10px;
+}
+
+.markdown-rendered .ms-notion-database-container .ms-db-grid-table td.ms-db-td.ms-db-add-row-td,
+.cm-html-embed .ms-notion-database-container .ms-db-grid-table td.ms-db-td.ms-db-add-row-td,
+.markdown-source-view .ms-notion-database-container .ms-db-grid-table td.ms-db-td.ms-db-add-row-td {
+  padding: 0;
+}
+
+.markdown-rendered .ms-notion-database-container .ms-db-grid-table th.ms-db-th-index,
+.markdown-rendered .ms-notion-database-container .ms-db-grid-table td.ms-db-td-index,
+.cm-html-embed .ms-notion-database-container .ms-db-grid-table th.ms-db-th-index,
+.cm-html-embed .ms-notion-database-container .ms-db-grid-table td.ms-db-td-index,
+.markdown-source-view .ms-notion-database-container .ms-db-grid-table th.ms-db-th-index,
+.markdown-source-view .ms-notion-database-container .ms-db-grid-table td.ms-db-td-index,
+.ms-notion-database-container .ms-db-grid-table th.ms-db-th-index,
+.ms-notion-database-container .ms-db-grid-table td.ms-db-td-index {
+  width: 42px;
+  min-width: 42px;
+  max-width: 42px;
+  padding: 0;
+  text-align: center;
+  vertical-align: middle;
+  box-sizing: border-box;
+}
+
 .ms-db-th-index {
   width: 42px;
   min-width: 42px;
@@ -601,7 +733,7 @@ input[type="text"].ms-filter-value-input:focus {
   text-align: center;
   vertical-align: middle;
   padding: 0;
-  border-top: 1px solid var(--ms-border);
+  border-top: none;
   border-bottom: 1px solid var(--ms-border);
   border-left: none;
   border-right: 1px solid var(--ms-border);
@@ -646,7 +778,7 @@ input[type="text"].ms-filter-value-input:focus {
   box-sizing: border-box;
   text-align: center;
   vertical-align: middle;
-  padding: 6px 4px;
+  padding: 0;
   border-bottom: 1px solid var(--ms-border);
   border-left: none;
   border-right: 1px solid var(--ms-border);
@@ -665,8 +797,9 @@ input[type="text"].ms-filter-value-input:focus {
 .ms-row-num-text {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  padding-right: 10px;
+  justify-content: center;
+  padding: 0;
+  margin: 0 auto;
   box-sizing: border-box;
   font-variant-numeric: tabular-nums;
   color: var(--text-normal);
@@ -676,13 +809,14 @@ input[type="text"].ms-filter-value-input:focus {
   pointer-events: none;
   width: 100%;
   height: 100%;
+  min-height: 32px;
+  text-align: center;
 }
 
 .ms-db-grid-table .ms-db-tr.is-row-focused .ms-db-td-index {
   background: linear-gradient(var(--ms-focus-th-bg), var(--ms-focus-th-bg)), var(--background-primary);
   color: var(--ms-blue-accent);
   font-weight: 600;
-  box-shadow: inset 0 1px 0 0 var(--ms-blue-accent), inset 0 -1px 0 0 var(--ms-blue-accent), inset 2px 0 0 0 var(--ms-blue-accent);
 }
 
 .ms-db-grid-table .ms-db-tr.is-row-focused .ms-row-num-text {
@@ -709,11 +843,6 @@ input[type="text"].ms-filter-value-input:focus {
   left: 0;
   z-index: 20;
   background: var(--background-primary);
-}
-
-.ms-db-th.is-dragging-col {
-  opacity: 0.4;
-  background: var(--ms-bg-hover);
 }
 
 .ms-db-grid-table thead tr {
@@ -763,12 +892,20 @@ input[type="text"].ms-filter-value-input:focus {
   color: var(--text-normal);
 }
 
-.ms-db-th.is-dragging-col {
-  opacity: 0.4;
+.ms-db-th.is-dragging-col,
+.ms-db-td.is-dragging-col {
+  opacity: 0.45;
+  background: var(--ms-bg-hover);
 }
 
-.ms-db-th.is-col-drop-target {
-  border-left: 3px solid var(--ms-blue-accent);
+.ms-db-th.is-col-drop-before,
+.ms-db-td.is-col-drop-before {
+  box-shadow: inset 3px 0 0 0 var(--ms-blue-accent);
+}
+
+.ms-db-th.is-col-drop-after,
+.ms-db-td.is-col-drop-after {
+  box-shadow: inset -3px 0 0 0 var(--ms-blue-accent);
 }
 
 .ms-db-th-content {
@@ -807,7 +944,6 @@ input[type="text"].ms-filter-value-input:focus {
   line-height: 1.2;
 }
 
-/* All table headers are strictly aligned to the left */
 .ms-db-th .ms-db-th-content,
 .ms-db-th.is-align-left .ms-db-th-content,
 .ms-db-th.is-align-center .ms-db-th-content,
@@ -1013,14 +1149,6 @@ input[type="text"].ms-filter-value-input:focus {
   background-color: var(--ms-focus-row-bg);
 }
 
-.ms-db-tr.is-row-focused > td.ms-db-td {
-  box-shadow: inset 0 1px 0 0 var(--ms-blue-accent), inset 0 -1px 0 0 var(--ms-blue-accent);
-}
-
-.ms-db-grid-table.no-row-numbers .ms-db-tr.is-row-focused td.is-first-data-col {
-  box-shadow: inset 0 1px 0 0 var(--ms-blue-accent), inset 0 -1px 0 0 var(--ms-blue-accent), inset 2px 0 0 0 var(--ms-blue-accent);
-}
-
 .ms-db-td {
   padding: 6px 10px;
   border-bottom: 1px solid var(--ms-border);
@@ -1036,10 +1164,33 @@ input[type="text"].ms-filter-value-input:focus {
 }
 
 .ms-db-td.is-focused {
-  outline: 2px solid var(--ms-focus-ring);
-  outline-offset: -2px;
-  background-color: var(--background-primary);
-  z-index: 10;
+  background-color: var(--ms-focus-cell-bg);
+}
+
+/* Focus fills must outrank theme rules for table cells in every render mode. */
+.markdown-rendered .ms-notion-database-container .ms-db-grid-table tr.ms-db-tr.is-row-focused > td.ms-db-td,
+.cm-html-embed .ms-notion-database-container .ms-db-grid-table tr.ms-db-tr.is-row-focused > td.ms-db-td,
+.markdown-source-view .ms-notion-database-container .ms-db-grid-table tr.ms-db-tr.is-row-focused > td.ms-db-td,
+.ms-notion-database-container .ms-db-grid-table tr.ms-db-tr.is-row-focused > td.ms-db-td {
+  background-color: var(--ms-focus-row-bg);
+}
+
+.markdown-rendered .ms-notion-database-container .ms-db-grid-table td.ms-db-td.is-col-focused,
+.cm-html-embed .ms-notion-database-container .ms-db-grid-table td.ms-db-td.is-col-focused,
+.markdown-source-view .ms-notion-database-container .ms-db-grid-table td.ms-db-td.is-col-focused,
+.ms-notion-database-container .ms-db-grid-table td.ms-db-td.is-col-focused {
+  background-color: var(--ms-focus-col-bg);
+}
+
+.markdown-rendered .ms-notion-database-container .ms-db-grid-table tr.ms-db-tr.is-row-focused > td.ms-db-td.is-focused,
+.cm-html-embed .ms-notion-database-container .ms-db-grid-table tr.ms-db-tr.is-row-focused > td.ms-db-td.is-focused,
+.markdown-source-view .ms-notion-database-container .ms-db-grid-table tr.ms-db-tr.is-row-focused > td.ms-db-td.is-focused,
+.ms-notion-database-container .ms-db-grid-table tr.ms-db-tr.is-row-focused > td.ms-db-td.is-focused,
+.markdown-rendered .ms-notion-database-container .ms-db-grid-table td.ms-db-td.is-focused,
+.cm-html-embed .ms-notion-database-container .ms-db-grid-table td.ms-db-td.is-focused,
+.markdown-source-view .ms-notion-database-container .ms-db-grid-table td.ms-db-td.is-focused,
+.ms-notion-database-container .ms-db-grid-table td.ms-db-td.is-focused {
+  background-color: var(--ms-focus-cell-bg);
 }
 
 .ms-db-td.is-editing {
@@ -1053,7 +1204,6 @@ input[type="text"].ms-filter-value-input:focus {
 }
 
 .ms-cell-text-wrapper.is-number {
-  text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1100,7 +1250,6 @@ input[type="text"].ms-filter-value-input:focus {
 
 .ms-inline-cell-input.is-number,
 .ms-db-grid-table .ms-db-td input.ms-inline-cell-input.is-number {
-  text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1130,17 +1279,11 @@ input[type="text"].ms-filter-value-input:focus {
   text-align: left;
 }
 
-.ms-db-td.is-align-left .ms-cell-text-wrapper.is-number {
-  text-align: right;
-}
-
-.ms-db-td.is-align-center .ms-cell-text-wrapper,
-.ms-db-td.is-align-center .ms-cell-text-wrapper.is-number {
+.ms-db-td.is-align-center .ms-cell-text-wrapper {
   text-align: center;
 }
 
-.ms-db-td.is-align-right .ms-cell-text-wrapper,
-.ms-db-td.is-align-right .ms-cell-text-wrapper.is-number {
+.ms-db-td.is-align-right .ms-cell-text-wrapper {
   text-align: right;
 }
 
@@ -1180,14 +1323,12 @@ input[type="text"].ms-filter-value-input:focus {
 }
 
 .ms-inline-cell-input.is-align-center,
-.ms-db-grid-table .ms-db-td input.ms-inline-cell-input.is-align-center,
-.ms-db-grid-table .ms-db-td input.ms-inline-cell-input.is-number.is-align-center {
+.ms-db-grid-table .ms-db-td input.ms-inline-cell-input.is-align-center {
   text-align: center;
 }
 
 .ms-inline-cell-input.is-align-right,
-.ms-db-grid-table .ms-db-td input.ms-inline-cell-input.is-align-right,
-.ms-db-grid-table .ms-db-td input.ms-inline-cell-input.is-number {
+.ms-db-grid-table .ms-db-td input.ms-inline-cell-input.is-align-right {
   text-align: right;
 }
 
@@ -1307,8 +1448,13 @@ input[type="text"].ms-filter-value-input:focus {
   background: transparent;
 }
 
-.ms-db-add-row-tr:hover td.ms-db-td-index {
+.ms-db-add-row-tr:hover td.ms-db-td-index,
+.ms-db-add-row-tr:hover td.ms-db-add-row-td {
   background: var(--ms-bg-hover);
+}
+
+.ms-db-add-row-tr:hover .ms-db-add-row-btn {
+  color: var(--text-normal);
 }
 
 .ms-db-add-row-td {
@@ -1316,6 +1462,7 @@ input[type="text"].ms-filter-value-input:focus {
   min-height: 28px;
   max-height: 28px;
   padding: 0;
+  cursor: pointer;
   border-bottom: 1px solid var(--ms-border);
   border-right: 1px solid var(--ms-border);
   box-sizing: border-box;
@@ -1328,16 +1475,28 @@ input[type="text"].ms-filter-value-input:focus {
   box-sizing: border-box;
 }
 
+.ms-db-add-row-inner {
+  position: sticky;
+  left: 0;
+  width: var(--ms-visible-width, 100%);
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
 .ms-db-grid-table button.ms-db-add-row-btn,
 button.ms-db-add-row-btn {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  width: 100%;
+  width: auto;
   height: 28px;
   min-height: 28px;
   max-height: 28px;
-  padding: 0 12px;
+  padding: 0 16px;
   border: none;
   background: transparent;
   box-shadow: none;
@@ -1346,8 +1505,8 @@ button.ms-db-add-row-btn {
   font-size: 0.85em;
   font-weight: 400;
   cursor: pointer;
-  text-align: left;
-  border-radius: 0;
+  text-align: center;
+  border-radius: 4px;
   box-sizing: border-box;
   transition: all 0.12s ease;
 }
@@ -1358,11 +1517,16 @@ button.ms-db-add-row-btn svg {
 
 .ms-db-grid-table button.ms-db-add-row-btn:hover,
 button.ms-db-add-row-btn:hover {
-  background: var(--ms-bg-hover);
+  background: transparent;
   color: var(--text-normal);
 }
 
 .ms-db-tfoot {
+  background: transparent;
+}
+
+.ms-db-tfoot.is-active,
+.ms-db-calc-tr:hover {
   background: var(--ms-bg-subtle);
 }
 
@@ -1386,8 +1550,12 @@ button.ms-db-add-row-btn:hover {
 }
 
 .ms-calc-placeholder {
-  opacity: 0.4;
+  opacity: 0;
   transition: opacity 0.12s ease;
+}
+
+.ms-db-calc-tr:hover .ms-calc-placeholder {
+  opacity: 0.45;
 }
 
 .ms-db-calc-td:hover .ms-calc-placeholder {
@@ -1557,6 +1725,21 @@ button.ms-db-add-row-btn:hover {
 
 .ms-kanban-prop-badge.is-checkbox {
   font-weight: 500;
+}
+
+.ms-kanban-prop-badge.is-number {
+  align-items: baseline;
+}
+
+.ms-kanban-prop-name {
+  color: var(--ms-text-muted);
+  opacity: 0.85;
+}
+
+.ms-kanban-prop-value {
+  color: var(--text-normal);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 
 .ms-kanban-prop-badge.is-checkbox.is-checked {

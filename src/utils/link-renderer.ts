@@ -92,6 +92,16 @@ export function parseLinkTokens(input: string): LinkToken[] {
   return tokens;
 }
 
+/**
+ * The text a renderer would leave behind for this value: "[[Page|Alias]]"
+ * becomes "Alias". Lets callers tell a flattened link from plain text.
+ */
+export function toPlainText(input: string): string {
+  return parseLinkTokens(input)
+    .map((token) => token.text)
+    .join("");
+}
+
 export function renderTextWithLinks(
   container: HTMLElement,
   text: string,

@@ -21,9 +21,7 @@ export class TableSyncService {
 
     const transform = (content: string): string => {
       if (initialSource) {
-        // Escape every RegExp metacharacter so the block body matches literally
         const escaped = initialSource.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        // Fenced block of a supported language that contains this exact source
         const exactBlockRegex = new RegExp(
           "```(?:table|notion-table|tablebase)[\\s\\S]*?" + escaped + "[\\s\\S]*?```"
         );
@@ -32,7 +30,6 @@ export class TableSyncService {
         }
       }
 
-      // Matches the first code block fenced by table, notion-table, or tablebase
       const firstTableBlockRegex = /```(?:table|notion-table|tablebase)[\s\S]*?```/;
       return content.replace(firstTableBlockRegex, replacement);
     };

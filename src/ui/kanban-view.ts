@@ -172,7 +172,6 @@ export class KanbanView {
       }
 
       const tags = parseCellTags(cellValue, this.options.settings.customTagColors);
-      // Strips surrounding wikilink brackets when the cell yields no parseable tags
       const key =
         tags.length > 0 ? tags[0].name : cellValue.replace(/^\[\[|\]\]$/g, "").trim();
 
@@ -413,13 +412,16 @@ export class KanbanView {
   }
 
   private renderCardProperties(propsEl: HTMLElement, row: MarkdownTableRow): void {
-    const { columns, filterState } = this.options;
+    const { columns, filterState, settings } = this.options;
+    const showEmpty = settings.showEmptyBoardProperties === true;
 
     columns.forEach((col, colIndex) => {
       if (colIndex === 0 || colIndex === this.groupByColIndex) return;
       if (filterState?.hiddenColumnIndices?.includes(colIndex)) return;
 
       const cellValue = (row.cells[colIndex] || "").trim();
+      // An unchecked checkbox is a value of its own, so it is never "empty".
+      if (!cellValue && !showEmpty && col.type !== "checkbox") return;
 
       switch (col.type) {
         case "multi-select":
@@ -435,9 +437,7 @@ export class KanbanView {
           this.renderCheckboxProperty(propsEl, row, col, colIndex, cellValue);
           return;
         default:
-          if (cellValue) {
-            this.renderTextProperty(propsEl, row, col, colIndex, cellValue);
-          }
+          this.renderTextProperty(propsEl, row, col, colIndex, cellValue);
       }
     });
   }
@@ -553,6 +553,47 @@ export class KanbanView {
     });
   }
 
+  /** Cells hold raw Markdown, so links have to be drawn, not printed. */
+  private fillTextProperty(
+    badge: HTMLElement,
+    col: TableColumn,
+    cellValue: string,
+    isNumber: boolean
+  ): void {
+    if (!cellValue) {
+      badge.setText(`+ ${col.name}`);
+      return;
+    }
+
+    if (isNumber) {
+      // A bare number tells the reader nothing on a card, so it carries its
+      // property name.
+      badge.addClass("is-number");
+      badge.createSpan({ cls: "ms-kanban-prop-name", text: col.name });
+      badge.createSpan({ cls: "ms-kanban-prop-value", text: cellValue });
+      return;
+    }
+
+    renderTextWithLinks(badge, cellValue, {
+      onExternalClick: (url, e) => {
+        e.stopPropagation();
+        if (typeof window !== "undefined" && url) {
+          window.open(url, "_blank");
+        }
+      },
+      onInternalClick: (path, e) => {
+        e.stopPropagation();
+        if (path && this.options.app?.workspace) {
+          void this.options.app.workspace.openLinkText?.(
+            path,
+            this.options.sourcePath || "",
+            false
+          );
+        }
+      },
+    });
+  }
+
   private renderTextProperty(
     propsEl: HTMLElement,
     row: MarkdownTableRow,
@@ -561,11 +602,9 @@ export class KanbanView {
     cellValue: string
   ): void {
     const isNumber = col.type === "number";
-    const badge = propsEl.createSpan({
-      cls: "ms-kanban-prop-badge",
-      text: `${isNumber ? "#" : ""} ${cellValue}`,
-    });
+    const badge = propsEl.createSpan({ cls: "ms-kanban-prop-badge" });
     badge.setAttribute("title", col.name);
+    this.fillTextProperty(badge, col, cellValue, isNumber);
 
     badge.addEventListener("click", (e) => {
       e.stopPropagation();

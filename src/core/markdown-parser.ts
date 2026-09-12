@@ -100,7 +100,6 @@ export function isDelimiterRow(line: string): boolean {
   const cells = splitTableRow(trimmed);
   if (cells.length === 0) return false;
 
-  // A delimiter cell is dashes with optional leading/trailing alignment colons
   return cells.every((cell) => /^:?-+:?$/.test(cell.trim()));
 }
 
@@ -130,7 +129,6 @@ export function formatColumnAlignmentToken(align: ColumnAlignment, width = 3): s
 }
 
 export function parseMarkdownTables(docContent: string): MarkdownTableData[] {
-  // Matches CRLF or LF newline sequences
   const lines = docContent.split(/\r?\n/);
   const tables: MarkdownTableData[] = [];
 
@@ -307,7 +305,6 @@ export function mutateTableInDocument(
   const isCrlf = docContent.includes("\r\n");
   const eol = isCrlf ? "\r\n" : "\n";
   const newTableLines = serializeMarkdownTable(targetTable).split("\n");
-  // Matches CRLF or LF newline sequences
   const lines = docContent.split(/\r?\n/);
   lines.splice(
     targetTable.startLine,
@@ -564,7 +561,6 @@ export function exportTableToCSV(
 ): string {
   const escapeCSV = (val: string) => {
     if (val.includes(",") || val.includes('"') || val.includes("\n")) {
-      // Escapes double quotes by doubling them for CSV format
       return `"${val.replace(/"/g, '""')}"`;
     }
     return val;

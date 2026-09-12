@@ -17,6 +17,7 @@ import {
   applyAddRow,
   applyCellUpdate,
   applyChangeColumnAlignment,
+  applyChangeColumnCalculation,
   applyChangeColumnDateFormat,
   applyChangeColumnType,
   applyDeleteColumn,
@@ -28,6 +29,7 @@ import {
 } from "../core/table-mutator";
 import { TableStateManager } from "../core/table-state";
 import {
+  CalculationType,
   ColumnAlignment,
   MarkdownTableData,
   MarkdownTableRow,
@@ -58,6 +60,12 @@ export type TableOperation =
   | { kind: "add-column"; headerText: string; atIndex?: number }
   | { kind: "rename-column"; colIndex: number; headerText: string }
   | { kind: "column-date-format"; colIndex: number; headerText: string }
+  | {
+      kind: "column-header";
+      colIndex: number;
+      headerText: string;
+      alignment?: string;
+    }
   | { kind: "column-alignment"; colIndex: number; alignment: ColumnAlignment }
   | { kind: "delete-column"; colIndex: number }
   | { kind: "reorder-rows"; fromIndex: number; toIndex: number }
@@ -203,7 +211,18 @@ export class TableViewController {
           const effectiveDateFormat =
             dateFormat ?? this.settingsService.getSettings().dateFormat;
           applyChangeColumnType(tableData, columns, colIndex, newType, effectiveDateFormat);
-          return { kind: "rename-column", colIndex, headerText: headerAt(colIndex) };
+          return {
+            kind: "column-header",
+            colIndex,
+            headerText: headerAt(colIndex),
+            alignment: tableData.alignments?.[colIndex],
+          };
+        }),
+
+      onColumnCalculationChange: (colIndex: number, calculation: CalculationType) =>
+        commit(() => {
+          applyChangeColumnCalculation(tableData, columns, colIndex, calculation);
+          return { kind: "column-header", colIndex, headerText: headerAt(colIndex) };
         }),
 
       onColumnDateFormatChange: (colIndex, newDateFormat) =>
@@ -327,6 +346,29 @@ function createDocumentTransform(
           startLine,
           operation.colIndex,
           operation.headerText,
+          previousHeaders,
+          tableIndex
+        );
+
+    case "column-header":
+      // A type switch also implies a new alignment, and renameColumnInDocument
+      // would only carry the header across.
+      return (content) =>
+        mutateTableInDocument(
+          content,
+          startLine,
+          (target) => {
+            const { colIndex, headerText, alignment } = operation;
+            if (colIndex < 0 || colIndex >= target.headers.length) return false;
+            target.headers[colIndex] = headerText;
+            if (alignment) {
+              while (target.alignments.length < target.headers.length) {
+                target.alignments.push("---");
+              }
+              target.alignments[colIndex] = alignment;
+            }
+            return true;
+          },
           previousHeaders,
           tableIndex
         );

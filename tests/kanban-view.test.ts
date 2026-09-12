@@ -280,4 +280,132 @@ describe("KanbanView", () => {
 
     windowOpenSpy.mockRestore();
   });
+
+  function findCard(el: HTMLElement, title: string): HTMLElement | undefined {
+    return Array.from(el.querySelectorAll<HTMLElement>(".ms-kanban-card")).find(
+      (card) => card.querySelector(".ms-kanban-card-title")?.textContent?.trim() === title
+    );
+  }
+
+  function renderBoard(settings: Partial<typeof DEFAULT_SETTINGS> = {}): HTMLElement {
+    const kanban = new KanbanView({
+      app: {} as App,
+      sourcePath: "notes/test.md",
+      tableData: sampleTableData,
+      columns: sampleColumns,
+      filterState: { ...defaultFilterState },
+      settings: { ...DEFAULT_SETTINGS, ...settings },
+      actions: createActions(),
+      onSwitchView: vi.fn(),
+    });
+
+    const el = kanban.getElement();
+    document.body.appendChild(el);
+    return el;
+  }
+
+  it("should hide empty card properties but always keep checkboxes", () => {
+    // "Write docs" has no due date and no status.
+    const card = findCard(renderBoard(), "Write docs");
+
+    expect(card).toBeDefined();
+    expect(card?.querySelector(".ms-kanban-prop-badge.is-date")).toBeNull();
+    expect(card?.querySelector(".ms-kanban-prop-badge.is-checkbox")).not.toBeNull();
+    expect(card?.textContent).toContain("Low");
+
+    // A card with a value still shows it.
+    const filled = findCard(renderBoard(), "Design UI");
+    expect(filled?.querySelector(".ms-kanban-prop-badge.is-date")).not.toBeNull();
+  });
+
+  it("should show placeholders for empty properties when the setting is enabled", () => {
+    const card = findCard(renderBoard({ showEmptyBoardProperties: true }), "Write docs");
+
+    const dateBadge = card?.querySelector(".ms-kanban-prop-badge.is-date");
+    expect(dateBadge).not.toBeNull();
+    expect(dateBadge?.textContent).toContain("Due");
+  });
+
+
+  it("should draw wikilinks in card properties instead of printing them", () => {
+    const columns: TableColumn[] = [
+      { index: 0, name: "Модуль", type: "text" },
+      { index: 1, name: "Статус", type: "select", uniqueTags: [{ id: "todo", name: "Todo", color: "blue" }] },
+      { index: 2, name: "Заметка", type: "text" },
+    ];
+    const tableData: MarkdownTableData = {
+      id: "table-links",
+      startLine: 0,
+      endLine: 3,
+      rawMarkdown: "",
+      headers: ["Модуль", "Статус", "Заметка"],
+      alignments: ["---", "---", "---"],
+      rows: [
+        {
+          rowIndex: 0,
+          cells: ["Ядро", "Todo", "[[System Design]]"],
+          rawLine: "| Ядро | Todo | [[System Design]] |",
+        },
+      ],
+    };
+
+    const kanban = new KanbanView({
+      app: {} as App,
+      sourcePath: "notes/test.md",
+      tableData,
+      columns,
+      filterState: { ...defaultFilterState },
+      settings: { ...DEFAULT_SETTINGS },
+      actions: createActions(),
+      onSwitchView: vi.fn(),
+    });
+
+    const el = kanban.getElement();
+    document.body.appendChild(el);
+
+    const link = el.querySelector<HTMLElement>(".ms-kanban-prop-badge .ms-cell-link.internal-link");
+    expect(link).not.toBeNull();
+    expect(link?.textContent).toBe("System Design");
+    expect(el.textContent).not.toContain("[[");
+  });
+
+
+  it("should label numeric card properties with their column name", () => {
+    const columns: TableColumn[] = [
+      { index: 0, name: "Модуль", type: "text" },
+      { index: 1, name: "Статус", type: "select", uniqueTags: [{ id: "todo", name: "Todo", color: "blue" }] },
+      { index: 2, name: "Покрытие (%)", type: "number" },
+    ];
+    const tableData: MarkdownTableData = {
+      id: "table-numbers",
+      startLine: 0,
+      endLine: 3,
+      rawMarkdown: "",
+      headers: ["Модуль", "Статус", "Покрытие (%)"],
+      alignments: ["---", "---", "---:"],
+      rows: [
+        { rowIndex: 0, cells: ["Ядро", "Todo", "94"], rawLine: "| Ядро | Todo | 94 |" },
+      ],
+    };
+
+    const kanban = new KanbanView({
+      app: {} as App,
+      sourcePath: "notes/test.md",
+      tableData,
+      columns,
+      filterState: { ...defaultFilterState },
+      settings: { ...DEFAULT_SETTINGS },
+      actions: createActions(),
+      onSwitchView: vi.fn(),
+    });
+
+    const el = kanban.getElement();
+    document.body.appendChild(el);
+
+    const badge = el.querySelector<HTMLElement>(".ms-kanban-prop-badge.is-number");
+    expect(badge).not.toBeNull();
+    expect(badge?.querySelector(".ms-kanban-prop-name")?.textContent).toBe("Покрытие (%)");
+    expect(badge?.querySelector(".ms-kanban-prop-value")?.textContent).toBe("94");
+  });
+
 });

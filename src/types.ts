@@ -120,6 +120,12 @@ export type Conjunction = "AND" | "OR";
 
 export type DatabaseViewType = "table" | "board";
 
+export interface SerializedSelection {
+  kind: "cell" | "row" | "column";
+  row?: number;
+  col?: number;
+}
+
 export interface TableFilterState {
   tableId: string;
   conjunction: Conjunction;
@@ -134,6 +140,8 @@ export interface TableFilterState {
   groupByColumnIndex?: number;
   stickyFirstColumn?: boolean;
   showRowNumbers?: boolean;
+  scrollLeft?: number;
+  selection?: SerializedSelection;
 }
 
 export type TagFormat = "comma" | "hashtag" | "wikilink";
@@ -155,6 +163,7 @@ export interface PluginSettings {
   enableCalculations: boolean;
   stickyFirstColumn: boolean;
   showRowNumbers: boolean;
+  showEmptyBoardProperties: boolean;
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -174,6 +183,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   enableCalculations: true,
   stickyFirstColumn: true,
   showRowNumbers: false,
+  showEmptyBoardProperties: false,
 };
 
 export interface MarkdownTableRow {

@@ -4,6 +4,7 @@ import {
   applyAddRow,
   applyCellUpdate,
   applyChangeColumnAlignment,
+  applyChangeColumnCalculation,
   applyChangeColumnDateFormat,
   applyChangeColumnType,
   applyDeleteColumn,
@@ -212,4 +213,74 @@ describe("Table Mutator Engine", () => {
     applyDeleteColumn(tableData, columns, 1);
     expect(tableData.alignments).toEqual(["---", "---:", "---"]);
   });
+
+  it("should annotate an explicitly chosen text type so auto-detection cannot undo it", () => {
+    const { tableData, columns } = createSampleTable();
+
+    // "Hours" holds numbers, so without an annotation it is re-detected as a
+    // number column on the next render.
+    applyChangeColumnType(tableData, columns, 2, "text");
+    expect(columns[2].type).toBe("text");
+    expect(tableData.headers[2]).toBe("Hours [text]");
+
+    applyChangeColumnType(tableData, columns, 1, "text");
+    expect(tableData.headers[1]).toBe("Status [text]");
+  });
+
+  it("should keep an explicit type annotation when a column is renamed", () => {
+    const { tableData, columns } = createSampleTable();
+
+    applyChangeColumnType(tableData, columns, 2, "text");
+    applyRenameColumn(tableData, columns, 2, "Effort");
+    expect(tableData.headers[2]).toBe("Effort [text]");
+    expect(columns[2].type).toBe("text");
+
+    // A plain column without an annotation stays plain after renaming.
+    applyRenameColumn(tableData, columns, 0, "Item");
+    expect(tableData.headers[0]).toBe("Item");
+  });
+
+  it("should right-align a column switched to number", () => {
+    const { tableData, columns } = createSampleTable();
+
+    applyChangeColumnType(tableData, columns, 0, "number");
+    expect(columns[0].align).toBe("right");
+    expect(tableData.alignments[0]).toBe("---:");
+  });
+
+  it("should store the chosen calculation in the column header", () => {
+    const { tableData, columns } = createSampleTable();
+
+    applyChangeColumnCalculation(tableData, columns, 2, "sum");
+    expect(columns[2].calculation).toBe("sum");
+    expect(tableData.headers[2]).toBe("Hours [number:sum]");
+
+    // Clearing the calculation keeps the type annotation: by then the header
+    // declares the type, and dropping it could undo a deliberate choice.
+    applyChangeColumnCalculation(tableData, columns, 2, "none");
+    expect(columns[2].calculation).toBeUndefined();
+    expect(tableData.headers[2]).toBe("Hours [number]");
+  });
+
+  it("should keep a calculation through renames and drop it when the type cannot use it", () => {
+    const { tableData, columns } = createSampleTable();
+
+    applyChangeColumnCalculation(tableData, columns, 2, "sum");
+    applyRenameColumn(tableData, columns, 2, "Effort");
+    expect(tableData.headers[2]).toBe("Effort [number:sum]");
+    expect(columns[2].calculation).toBe("sum");
+
+    applyChangeColumnType(tableData, columns, 2, "checkbox");
+    expect(columns[2].calculation).toBeUndefined();
+    expect(tableData.headers[2]).toBe("Effort [checkbox]");
+  });
+
+  it("should keep the calculation next to the date format", () => {
+    const { tableData, columns } = createSampleTable();
+
+    applyChangeColumnType(tableData, columns, 0, "date", "DD.MM.YYYY");
+    applyChangeColumnCalculation(tableData, columns, 0, "count_not_empty");
+    expect(tableData.headers[0]).toBe("Task [date:DD.MM.YYYY,count_not_empty]");
+  });
+
 });

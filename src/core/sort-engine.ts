@@ -12,11 +12,8 @@ const CHECKED_VALUES = new Set<string>([
   "✔",
 ]);
 
-// Currency symbols and percent signs stripped before numeric parsing
 const CURRENCY_AND_PERCENT = /[$€£¥₽%]/g;
-// Matches whitespace characters
 const WHITESPACE = /\s+/g;
-// Everything except digits, decimal point and minus sign
 const NON_NUMERIC = /[^\d.-]/g;
 
 export function isCellChecked(cell: string): boolean {

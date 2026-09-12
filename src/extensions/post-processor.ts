@@ -1,4 +1,7 @@
-import { MarkdownPostProcessorContext } from "obsidian";
+import { MarkdownPostProcessorContext, MarkdownSectionInformation } from "obsidian";
+import { findTargetTable, parseMarkdownTables } from "../core/markdown-parser";
+import { stripTypeAnnotation } from "../core/table-mutator";
+import { toPlainText } from "../utils/link-renderer";
 import { TableViewController } from "../services/table-view-controller";
 import { TableViewRegistry } from "../services/table-view-registry";
 import { MarkdownTableData, MarkdownTableRow } from "../types";
@@ -40,6 +43,77 @@ export class TablePostProcessor {
     );
   }
 
+  /**
+   * Column alignment lives in the delimiter row, which the renderer does not
+   * reproduce in the DOM, so it has to be read back from the note itself.
+   */
+  private findSourceTable(
+    sectionInfo: MarkdownSectionInformation | null,
+    headers: string[],
+    rowCount: number,
+    tableIndex: number
+  ): MarkdownTableData | undefined {
+    if (!sectionInfo?.text) return undefined;
+
+    const candidate = findTargetTable(
+      parseMarkdownTables(sectionInfo.text),
+      sectionInfo.lineStart,
+      headers,
+      tableIndex
+    );
+    if (!candidate) return undefined;
+    if (candidate.headers.length !== headers.length) return undefined;
+    if (candidate.rows.length !== rowCount) return undefined;
+
+    return candidate;
+  }
+
+  /**
+   * Takes the header from the note whenever it is the rendered text plus a type
+   * annotation, so a "[text]"-style suffix survives even if the renderer drops
+   * it. Anything else (formatting, links) keeps the rendered text.
+   */
+  private reconcileHeaders(
+    renderedHeaders: string[],
+    source: MarkdownTableData | undefined
+  ): string[] {
+    if (!source) return [...renderedHeaders];
+
+    return renderedHeaders.map((rendered, index) => {
+      const fromSource = source.headers[index];
+      if (!fromSource) return rendered;
+      return stripTypeAnnotation(fromSource) === rendered ? fromSource : rendered;
+    });
+  }
+
+  /**
+   * The renderer turns "[[Page]]" into bare text, which would leave the grid
+   * with a dead link. Where the rendered text is exactly the flattened source
+   * cell, the source wins; anything else (bold, italics) keeps what was
+   * rendered, since the grid cannot draw it back.
+   */
+  private reconcileRows(
+    renderedRows: MarkdownTableRow[],
+    source: MarkdownTableData | undefined
+  ): MarkdownTableRow[] {
+    if (!source) return renderedRows;
+
+    return renderedRows.map((row, rowIndex) => {
+      const sourceRow = source.rows[rowIndex];
+      if (!sourceRow) return row;
+
+      return {
+        ...row,
+        rawLine: sourceRow.rawLine,
+        cells: row.cells.map((rendered, colIndex) => {
+          const fromSource = sourceRow.cells[colIndex];
+          if (fromSource === undefined) return rendered;
+          return toPlainText(fromSource) === rendered ? fromSource : rendered;
+        }),
+      };
+    });
+  }
+
   private enhanceTable(
     tableEl: HTMLTableElement,
     ctx: MarkdownPostProcessorContext,
@@ -67,15 +141,18 @@ export class TablePostProcessor {
     const sectionInfo = ctx.getSectionInfo?.(tableEl) ?? null;
     const startLine = sectionInfo ? sectionInfo.lineStart : -1;
     const endLine = sectionInfo ? sectionInfo.lineEnd : -1;
+    const source = this.findSourceTable(sectionInfo, headers, rows.length, tableIndex);
 
     const tableData: MarkdownTableData = {
       id: `tbl_${ctx.sourcePath || "doc"}_${startLine}_${tableIndex}`,
-      headers: [...headers],
-      alignments: new Array<string>(headers.length).fill("---"),
-      rows,
+      headers: this.reconcileHeaders(headers, source),
+      alignments: source
+        ? [...source.alignments]
+        : new Array<string>(headers.length).fill("---"),
+      rows: this.reconcileRows(rows, source),
       startLine,
       endLine,
-      rawMarkdown: "",
+      rawMarkdown: source ? source.rawMarkdown : "",
     };
 
     const view = this.viewController.createInlineTableView({

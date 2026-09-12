@@ -4,9 +4,7 @@ export function isPrintMode(el: HTMLElement): boolean {
   if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
     try {
       if (window.matchMedia("print").matches) return true;
-    } catch {
-      // ignore media query evaluation errors
-    }
+    } catch { /* matchMedia may throw in non-browser environments */ }
   }
   return false;
 }

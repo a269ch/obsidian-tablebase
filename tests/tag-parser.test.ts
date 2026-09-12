@@ -88,6 +88,16 @@ describe("Tag Parser & Formatter", () => {
       expect(looksLikeMultiSelect(values, "Skills")).toBe(true);
     });
 
+    it("should treat a column of single wikilinks as links, not tags", () => {
+      const values = ["[[System Design]]", "[[Obsidian API]]", "[[REST]]"];
+      expect(looksLikeMultiSelect(values, "Заметка")).toBe(false);
+    });
+
+    it("should still detect cells holding several wikilinks", () => {
+      const values = ["[[Sync]] [[Network]]", "[[Libs]] [[Utils]]", "[[Core]]"];
+      expect(looksLikeMultiSelect(values, "Заметка")).toBe(true);
+    });
+
     it("should return false for regular single-value columns", () => {
       const values = ["Alice", "Bob", "Charlie", "David"];
       expect(looksLikeMultiSelect(values, "Author")).toBe(false);

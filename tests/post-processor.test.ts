@@ -40,7 +40,13 @@ function buildRenderedTable(headers: string[], rows: string[][]): HTMLElement {
   return wrapper;
 }
 
-function createProcessor(): {
+interface SectionSource {
+  text: string;
+  lineStart: number;
+  lineEnd: number;
+}
+
+function createProcessor(sectionInfo?: SectionSource): {
   processor: TablePostProcessor;
   ctx: MarkdownPostProcessorContext;
   settingsService: SettingsService;
@@ -65,11 +71,12 @@ function createProcessor(): {
     sourcePath: "Notes/Test.md",
     frontmatter: null,
     addChild: vi.fn(),
-    getSectionInfo: () => ({
-      text: "",
-      lineStart: 3,
-      lineEnd: 6,
-    }),
+    getSectionInfo: () =>
+      sectionInfo ?? {
+        text: "",
+        lineStart: 3,
+        lineEnd: 6,
+      },
   } as unknown as MarkdownPostProcessorContext;
 
   return { processor, ctx, settingsService };
@@ -405,7 +412,6 @@ describe("TablePostProcessor date columns", () => {
   it("should skip table enhancement during print or PDF export", () => {
     const { processor, ctx } = createProcessor();
 
-    // 1. Element inside .print container
     const printContainer = document.createElement("div");
     printContainer.addClass("print");
     const tableWrapper1 = buildRenderedTable(["Col A"], [["Val 1"]]);
@@ -416,7 +422,6 @@ describe("TablePostProcessor date columns", () => {
     expect(tableWrapper1.querySelector(".ms-notion-database-container")).toBeNull();
     expect(tableWrapper1.querySelector("table")?.classList.contains("ms-table-hidden")).toBe(false);
 
-    // 2. Element inside .pdf-export container
     const pdfContainer = document.createElement("div");
     pdfContainer.addClass("pdf-export");
     const tableWrapper2 = buildRenderedTable(["Col B"], [["Val 2"]]);
@@ -427,7 +432,6 @@ describe("TablePostProcessor date columns", () => {
     expect(tableWrapper2.querySelector(".ms-notion-database-container")).toBeNull();
     expect(tableWrapper2.querySelector("table")?.classList.contains("ms-table-hidden")).toBe(false);
 
-    // 3. Document body has .print class
     document.body.addClass("print");
     const tableWrapper3 = buildRenderedTable(["Col C"], [["Val 3"]]);
     processor.process(tableWrapper3, ctx);
@@ -435,7 +439,6 @@ describe("TablePostProcessor date columns", () => {
     expect(tableWrapper3.querySelector("table")?.classList.contains("ms-table-hidden")).toBe(false);
     document.body.removeClass("print");
 
-    // 4. matchMedia("print").matches is true
     const matchMediaSpy = vi.spyOn(window, "matchMedia").mockImplementation((query: string) => {
       return {
         matches: query === "print",
@@ -456,4 +459,138 @@ describe("TablePostProcessor date columns", () => {
 
     matchMediaSpy.mockRestore();
   });
+});
+
+describe("TablePostProcessor source parsing", () => {
+  beforeAll(() => {
+    installObsidianDomHelpers(window as Window & typeof globalThis);
+  });
+
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    window.innerHeight = 800;
+    window.innerWidth = 1200;
+  });
+
+  it("should take column alignment from the note source instead of the rendered table", () => {
+    const text = [
+      "# Notes",
+      "",
+      "| Task | Amount |",
+      "| :--- | ---: |",
+      "| Buy bread | 12 |",
+      "",
+    ].join("\n");
+
+    const { processor, ctx } = createProcessor({ text, lineStart: 2, lineEnd: 4 });
+    const wrapper = buildRenderedTable(["Task", "Amount"], [["Buy bread", "12"]]);
+
+    processor.process(wrapper, ctx);
+
+    const cells = wrapper.querySelectorAll<HTMLElement>(".ms-db-td[data-col-index]");
+    expect(cells[0].classList.contains("is-align-left")).toBe(true);
+    expect(cells[1].classList.contains("is-align-right")).toBe(true);
+  });
+
+  it("should honour an explicit left alignment on a number column", () => {
+    const text = [
+      "| Item | Amount [number] |",
+      "| --- | :--- |",
+      "| Milk | 12 |",
+    ].join("\n");
+
+    const { processor, ctx } = createProcessor({ text, lineStart: 0, lineEnd: 2 });
+    const wrapper = buildRenderedTable(["Item", "Amount [number]"], [["Milk", "12"]]);
+
+    processor.process(wrapper, ctx);
+
+    const amountCell = wrapper.querySelector<HTMLElement>('.ms-db-td[data-col-index="1"]');
+    expect(amountCell?.classList.contains("is-align-left")).toBe(true);
+    expect(
+      amountCell?.querySelector(".ms-cell-text-wrapper")?.classList.contains("is-number")
+    ).toBe(true);
+  });
+
+  it("should fall back to the rendered table when the source does not match", () => {
+    const text = ["| A | B |", "| --- | --- |", "| 1 | 2 |"].join("\n");
+
+    const { processor, ctx } = createProcessor({ text, lineStart: 0, lineEnd: 2 });
+    const wrapper = buildRenderedTable(["X", "Y", "Z"], [["1", "2", "3"]]);
+
+    processor.process(wrapper, ctx);
+
+    const names = Array.from(wrapper.querySelectorAll(".ms-db-col-name")).map(
+      (el) => el.textContent
+    );
+    expect(names).toEqual(["X", "Y", "Z"]);
+  });
+  it("should recover a type annotation the renderer dropped from the header", () => {
+    const text = [
+      "| Модуль | Категория [text] |",
+      "| --- | --- |",
+      "| Ядро | Architecture, Core |",
+    ].join("\n");
+
+    // The rendered header lost its "[text]" suffix.
+    const { processor, ctx } = createProcessor({ text, lineStart: 0, lineEnd: 2 });
+    const wrapper = buildRenderedTable(["Модуль", "Категория"], [["Ядро", "Architecture, Core"]]);
+
+    processor.process(wrapper, ctx);
+
+    const cell = wrapper.querySelector<HTMLElement>('.ms-db-td[data-col-index="1"]');
+    expect(cell?.querySelector(".ms-cell-text-wrapper")).not.toBeNull();
+    expect(cell?.querySelector(".ms-tag-badge")).toBeNull();
+  });
+
+  it("should keep the rendered header when the source header carries Markdown", () => {
+    const text = ["| Модуль | **Категория** |", "| --- | --- |", "| Ядро | Core |"].join("\n");
+
+    const { processor, ctx } = createProcessor({ text, lineStart: 0, lineEnd: 2 });
+    const wrapper = buildRenderedTable(["Модуль", "Категория"], [["Ядро", "Core"]]);
+
+    processor.process(wrapper, ctx);
+
+    const names = Array.from(wrapper.querySelectorAll(".ms-db-col-name")).map((el) => el.textContent);
+    expect(names).toEqual(["Модуль", "Категория"]);
+  });
+
+  it("should bring wikilinks back to life in cells the renderer flattened", () => {
+    const text = [
+      "| Заметка | Проверено |",
+      "| --- | --- |",
+      "| [[System Design]] | [x] |",
+      "| [[Obsidian API|Obsidian]] | [ ] |",
+    ].join("\n");
+
+    const { processor, ctx } = createProcessor({ text, lineStart: 0, lineEnd: 3 });
+    // Obsidian renders the wikilinks as bare text inside the <td>.
+    const wrapper = buildRenderedTable(
+      ["Заметка", "Проверено"],
+      [["System Design", "[x]"], ["Obsidian", "[ ]"]]
+    );
+
+    processor.process(wrapper, ctx);
+
+    const links = wrapper.querySelectorAll<HTMLElement>(
+      '.ms-db-td[data-col-index="0"] .ms-cell-link.internal-link'
+    );
+    expect(links.length).toBe(2);
+    expect(links[0].textContent).toBe("System Design");
+    expect(links[0].dataset.href).toBe("System Design");
+    expect(links[1].textContent).toBe("Obsidian");
+    expect(links[1].dataset.href).toBe("Obsidian API");
+  });
+
+  it("should keep the rendered text for cells whose Markdown it cannot draw", () => {
+    const text = ["| Заметка |", "| --- |", "| **важно** |"].join("\n");
+
+    const { processor, ctx } = createProcessor({ text, lineStart: 0, lineEnd: 2 });
+    const wrapper = buildRenderedTable(["Заметка"], [["важно"]]);
+
+    processor.process(wrapper, ctx);
+
+    const cell = wrapper.querySelector<HTMLElement>('.ms-db-td[data-col-index="0"]');
+    expect(cell?.textContent).toBe("важно");
+  });
+
 });

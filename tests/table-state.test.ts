@@ -217,4 +217,29 @@ describe("Table State Manager", () => {
     expect(columns[2].type).toBe("text");
     expect(columns[2].align).toBe("left");
   });
+  it("should read the footer calculation from the column annotation", () => {
+    const manager = new TableStateManager();
+    const table: MarkdownTableData = {
+      id: "tbl_calc",
+      headers: ["Задача", "Часы [number:sum]", "Срок [date:DD.MM.YYYY,count_not_empty]"],
+      alignments: ["---", "---:", "---"],
+      rows: [
+        { rowIndex: 0, rawLine: "", cells: ["A", "12", "01.02.2026"] },
+        { rowIndex: 1, rawLine: "", cells: ["B", "7", ""] },
+      ],
+      startLine: 0,
+      endLine: 3,
+      rawMarkdown: "",
+    };
+
+    const columns = manager.analyzeColumns(table, DEFAULT_SETTINGS);
+
+    expect(columns[0].calculation).toBeUndefined();
+    expect(columns[1].type).toBe("number");
+    expect(columns[1].calculation).toBe("sum");
+    expect(columns[2].type).toBe("date");
+    expect(columns[2].dateFormat).toBe("DD.MM.YYYY");
+    expect(columns[2].calculation).toBe("count_not_empty");
+  });
+
 });

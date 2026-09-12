@@ -123,6 +123,37 @@ export interface CalculationOption {
   label: string;
 }
 
+const CALCULATION_TYPES = new Set<string>([
+  "none",
+  "count_all",
+  "count_values",
+  "count_unique",
+  "count_empty",
+  "count_not_empty",
+  "sum",
+  "average",
+  "min",
+  "max",
+  "percent_checked",
+  "percent_unchecked",
+  "count_checked",
+  "count_unchecked",
+]);
+
+export function isCalculationType(value: string): value is CalculationType {
+  return CALCULATION_TYPES.has(value);
+}
+
+export function isCalculationAllowedFor(
+  type: ColumnType,
+  calculation: CalculationType | undefined
+): boolean {
+  if (!calculation || calculation === "none") return false;
+  return getCalculationOptionsForColumnType(type).some(
+    (option) => option.value === calculation
+  );
+}
+
 export function getCalculationOptionsForColumnType(type: ColumnType): CalculationOption[] {
   if (type === "number") {
     return [

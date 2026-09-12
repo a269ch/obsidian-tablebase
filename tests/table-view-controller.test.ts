@@ -117,4 +117,86 @@ describe("TableViewController", () => {
     const resultDelRow = capturedTransform!(raw);
     expect(resultDelRow).toBeDefined();
   });
+
+  it("should write both the type annotation and the alignment of a retyped column", async () => {
+    const raw = "| Task | Amount |\n| --- | --- |\n| Buy milk | 12 |";
+    const tableData: MarkdownTableData = parseMarkdownTables(raw)[0];
+
+    let capturedTransform: ((content: string) => string) | null = null;
+    vi.spyOn(syncService, "syncInlineTable").mockImplementation(async (_path, transform) => {
+      capturedTransform = transform;
+    });
+
+    const view = controller.createInlineTableView({
+      sourcePath: "inline.md",
+      tableData,
+      startLine: 0,
+      tableIndex: 0,
+    });
+
+    // "Task" holds text, so switching it to number also flips its alignment.
+    await view.actions.onColumnTypeChange(0, "number");
+    const asNumber = capturedTransform!(raw);
+    expect(asNumber).toContain("Task [number]");
+
+    const delimiterCells = asNumber
+      .split("\n")[1]
+      .split("|")
+      .map((cell) => cell.trim())
+      .filter((cell) => cell.length > 0);
+    expect(delimiterCells[0].endsWith(":")).toBe(true);
+
+    // Switching to text has to be written down too, otherwise the numeric
+    // values would make the column detect itself as a number again.
+    await view.actions.onColumnTypeChange(1, "text");
+    expect(capturedTransform!(asNumber)).toContain("Amount [text]");
+  });
+
+
+  it("should keep the cell selection when the view is rebuilt for the same table", () => {
+    const raw = "| Task | Status |\n| --- | --- |\n| Buy milk | Todo |\n| Write docs | Done |";
+    const tableData: MarkdownTableData = parseMarkdownTables(raw)[0];
+    const params = { sourcePath: "inline.md", tableData, startLine: 0, tableIndex: 0 };
+
+    const view = controller.createInlineTableView(params);
+    view.getElement();
+    view.selection.focusCell(1, 1);
+    view.applySelection();
+    view.dispose();
+
+    // Every write makes Obsidian re-render the section and build a new view.
+    const rebuilt = controller.createInlineTableView(params);
+    expect(rebuilt.selection.isCellFocused(1, 1)).toBe(true);
+
+    rebuilt.clearFocus();
+    const afterClear = controller.createInlineTableView(params);
+    expect(afterClear.selection.isEmpty()).toBe(true);
+  });
+
+
+  it("should write the chosen calculation into the column header", async () => {
+    const raw = "| Task | Hours |\n| --- | --- |\n| Buy milk | 12 |\n| Write docs | 7 |";
+    const tableData: MarkdownTableData = parseMarkdownTables(raw)[0];
+
+    let capturedTransform: ((content: string) => string) | null = null;
+    vi.spyOn(syncService, "syncInlineTable").mockImplementation(async (_path, transform) => {
+      capturedTransform = transform;
+    });
+
+    const view = controller.createInlineTableView({
+      sourcePath: "inline.md",
+      tableData,
+      startLine: 0,
+      tableIndex: 0,
+    });
+
+    await view.actions.onColumnCalculationChange(1, "sum");
+    const withSum = capturedTransform!(raw);
+    expect(withSum).toContain("Hours [number:sum]");
+    expect(view.columns[1].calculation).toBe("sum");
+
+    await view.actions.onColumnCalculationChange(1, "none");
+    expect(capturedTransform!(withSum)).not.toContain(":sum");
+  });
+
 });

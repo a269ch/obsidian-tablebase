@@ -1,5 +1,6 @@
 import { App } from "obsidian";
 import {
+  CalculationType,
   ColumnAlignment,
   ColumnType,
   DatabaseViewType,
@@ -35,6 +36,7 @@ export interface TableViewActions {
   ): Promise<void>;
   onColumnDateFormatChange(colIndex: number, newDateFormat: DateFormatOption): Promise<void>;
   onColumnAlignmentChange(colIndex: number, alignment: ColumnAlignment): Promise<void>;
+  onColumnCalculationChange(colIndex: number, calculation: CalculationType): Promise<void>;
   onReorderColumns(fromIndex: number, toIndex: number): Promise<void>;
   onFilterChange(state: TableFilterState): void;
   onSortChange(sortRules: SortRule[]): void;

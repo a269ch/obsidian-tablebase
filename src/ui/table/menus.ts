@@ -583,8 +583,7 @@ export class TableMenus {
         appendIcon(item.createSpan({ cls: "ms-check" }), ICON_CHECK);
       }
       item.addEventListener("click", () => {
-        column.calculation = option.value;
-        this.ctx.render();
+        void this.ctx.actions.onColumnCalculationChange(column.index, option.value);
         menu.remove();
       });
     }

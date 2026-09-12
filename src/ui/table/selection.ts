@@ -1,3 +1,5 @@
+import { SerializedSelection } from "../../types";
+
 export interface FocusedCell {
   row: number;
   col: number;
@@ -39,6 +41,28 @@ export class SelectionModel {
 
   public clear(): void {
     this.state = { kind: "none" };
+  }
+
+  public serialize(): SerializedSelection | undefined {
+    const state = this.state;
+    if (state.kind === "cell") return { kind: "cell", row: state.row, col: state.col };
+    if (state.kind === "row") return { kind: "row", row: state.row };
+    if (state.kind === "column") return { kind: "column", col: state.col };
+    return undefined;
+  }
+
+  public restore(snapshot?: SerializedSelection | null): void {
+    const { row, col } = snapshot ?? {};
+
+    if (snapshot?.kind === "cell" && typeof row === "number" && typeof col === "number") {
+      this.state = { kind: "cell", row, col };
+    } else if (snapshot?.kind === "row" && typeof row === "number") {
+      this.state = { kind: "row", row };
+    } else if (snapshot?.kind === "column" && typeof col === "number") {
+      this.state = { kind: "column", col };
+    } else {
+      this.state = { kind: "none" };
+    }
   }
 
   public isEmpty(): boolean {

@@ -12,11 +12,13 @@ import {
 } from "../icons";
 import { closeAllFloatingPopovers } from "../popover";
 import { CellRenderer, resolveColumnAlignment } from "./cells";
+import { DisposableRegistry } from "../../utils/lifecycle";
 import { bindColumnResizer, ColumnDragController, RowDragController } from "./dnd";
 import { TableMenus } from "./menus";
 import { TableViewContext } from "./types";
 
 const ADD_COLUMN_WIDTH = 28;
+const INDEX_COLUMN_WIDTH = 42;
 
 export class TableGrid {
   private ctx: TableViewContext;
@@ -28,6 +30,7 @@ export class TableGrid {
 
   private tableEl: HTMLTableElement | null = null;
   private tbodyEl: HTMLTableSectionElement | null = null;
+  private scrollRegistry: DisposableRegistry;
 
   constructor(
     ctx: TableViewContext,
@@ -42,6 +45,7 @@ export class TableGrid {
     this.rowDrag = rowDrag;
     this.columnDrag = new ColumnDragController(ctx);
     this.openAddColumnModal = openAddColumnModal;
+    this.scrollRegistry = ctx.registry.add(new DisposableRegistry());
   }
 
   public getVisibleRows(): MarkdownTableRow[] {
@@ -60,6 +64,8 @@ export class TableGrid {
       closeAllFloatingPopovers();
       this.ctx.clearFocus();
     });
+
+    this.bindScrollWrapper(scrollWrapper);
 
     const { settings } = this.ctx;
     const showRowNumbers = this.ctx.isRowNumbersVisible();
@@ -98,6 +104,39 @@ export class TableGrid {
     return this.tableEl;
   }
 
+  private bindScrollWrapper(scrollWrapper: HTMLElement): void {
+    const { filterState } = this.ctx;
+    // Each render builds a fresh wrapper, so drop what was bound to the old one.
+    const registry = this.scrollRegistry;
+    registry.disposeAll();
+
+    const syncVisibleWidth = (): void => {
+      const visibleWidth = scrollWrapper.clientWidth;
+      if (visibleWidth > 0) {
+        scrollWrapper.style.setProperty("--ms-visible-width", `${visibleWidth}px`);
+      } else {
+        scrollWrapper.style.removeProperty("--ms-visible-width");
+      }
+    };
+
+    registry.listen(scrollWrapper, "scroll", () => {
+      filterState.scrollLeft = scrollWrapper.scrollLeft;
+    });
+
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(() => syncVisibleWidth());
+      observer.observe(scrollWrapper);
+      registry.addFn(() => observer.disconnect());
+    }
+
+    // The wrapper is still detached while the view is being built, so both
+    // measuring and restoring the offset have to wait for layout.
+    registry.animationFrame(() => {
+      syncVisibleWidth();
+      scrollWrapper.scrollLeft = filterState.scrollLeft ?? 0;
+    });
+  }
+
   private renderHead(tableEl: HTMLTableElement, showRowNumbers: boolean): void {
     const thead = tableEl.createEl("thead");
     const headerRow = thead.createEl("tr");
@@ -115,6 +154,7 @@ export class TableGrid {
 
   private renderIndexHeader(headerRow: HTMLTableRowElement): void {
     const indexTh = headerRow.createEl("th", { cls: "ms-db-th-index" });
+    setFixedWidth(indexTh, INDEX_COLUMN_WIDTH);
     const content = indexTh.createDiv({
       cls: "ms-db-th-content ms-db-th-index-content",
     });
@@ -162,7 +202,7 @@ export class TableGrid {
       });
     }
 
-    this.columnDrag.attachHeader(th, columnIndex, headerRow);
+    this.columnDrag.attachHeader(th, columnIndex);
 
     const headerContent = th.createDiv({ cls: "ms-db-th-content" });
     appendIcon(
@@ -269,14 +309,9 @@ export class TableGrid {
 
     this.renderAddRow(tbody, visibleColumns.length, showRowNumbers, visibleRows.length);
 
-    const hasActiveCalculations = this.ctx.columns.some(
-      (col) => col.calculation && col.calculation !== "none"
-    );
-    if (
-      this.ctx.settings.enableCalculations &&
-      hasActiveCalculations &&
-      visibleColumns.length > 0
-    ) {
+    // The bar is the only way into the calculations, so it is always there;
+    // its cells stay blank until hovered.
+    if (this.ctx.settings.enableCalculations && visibleColumns.length > 0) {
       this.renderCalculationBar(tableEl, visibleRows, visibleColumns, showRowNumbers);
     }
 
@@ -315,6 +350,7 @@ export class TableGrid {
 
   private renderIndexCell(tr: HTMLTableRowElement, row: MarkdownTableRow): void {
     const indexTd = tr.createEl("td", { cls: "ms-db-td-index" });
+    setFixedWidth(indexTd, INDEX_COLUMN_WIDTH);
     indexTd.createSpan({ cls: "ms-row-num-text", text: `${row.rowIndex + 1}` });
     indexTd.setAttribute("title", "Click to select row, right-click for options");
 
@@ -380,7 +416,10 @@ export class TableGrid {
     this.rowDrag.attachAddRowDropTarget(addRowTr, totalRowCount);
 
     if (showRowNumbers) {
-      addRowTr.createEl("td", { cls: "ms-db-td-index ms-db-add-row-index-td" });
+      const addRowIndexTd = addRowTr.createEl("td", {
+        cls: "ms-db-td-index ms-db-add-row-index-td",
+      });
+      setFixedWidth(addRowIndexTd, INDEX_COLUMN_WIDTH);
     }
 
     const addRowTd = addRowTr.createEl("td", {
@@ -388,11 +427,14 @@ export class TableGrid {
       attr: { colspan: `${visibleColumnCount + 1}` },
     });
 
-    const addRowBtn = addRowTd.createEl("button", { cls: "ms-db-add-row-btn" });
-    appendIconLabel(addRowBtn, ICON_PLUS, "New");
-    addRowBtn.addEventListener("click", () => {
+    addRowTd.addEventListener("click", () => {
       void this.ctx.actions.onAddRow();
     });
+
+    const addRowInner = addRowTd.createDiv({ cls: "ms-db-add-row-inner" });
+    // Clicks on the button bubble up to the cell handler above.
+    const addRowBtn = addRowInner.createEl("button", { cls: "ms-db-add-row-btn" });
+    appendIconLabel(addRowBtn, ICON_PLUS, "New");
   }
 
   private renderCalculationBar(
@@ -401,11 +443,19 @@ export class TableGrid {
     columns: TableColumn[],
     showRowNumbers: boolean
   ): void {
-    const tfoot = tableEl.createEl("tfoot", { cls: "ms-db-tfoot" });
+    const hasValues = columns.some(
+      (col) => col.calculation && col.calculation !== "none"
+    );
+    const tfoot = tableEl.createEl("tfoot", {
+      cls: `ms-db-tfoot${hasValues ? " is-active" : ""}`,
+    });
     const calcRow = tfoot.createEl("tr", { cls: "ms-db-calc-tr" });
 
     if (showRowNumbers) {
-      calcRow.createEl("td", { cls: "ms-db-td-index ms-calc-index" });
+      const calcIndexTd = calcRow.createEl("td", {
+        cls: "ms-db-td-index ms-calc-index",
+      });
+      setFixedWidth(calcIndexTd, INDEX_COLUMN_WIDTH);
     }
 
     columns.forEach((col, orderIndex) => {

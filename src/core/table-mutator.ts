@@ -1,4 +1,5 @@
 import {
+  CalculationType,
   ColumnAlignment,
   ColumnType,
   DateFormatOption,
@@ -6,6 +7,7 @@ import {
   MarkdownTableRow,
   TableColumn,
 } from "../types";
+import { isCalculationAllowedFor } from "./calculation-engine";
 import { formatDateByOption, parseDateByOption } from "./date-utils";
 import { formatColumnAlignmentToken } from "./markdown-parser";
 
@@ -77,19 +79,15 @@ export function applyDeleteRow(
   return removed || null;
 }
 
-// Trailing header type tag: "Due [date:DD.MM.YYYY]" -> group 1 = type, group 2 = optional date format
 export const TYPE_ANNOTATION_REGEX =
   /\s*\[(text|multi-select|select|number|checkbox|date)(?::([^\]]+))?\]$/i;
 
-// Whole-header match for headers that imply a single-choice column
 export const SINGLE_SELECT_KEYWORDS =
   /^(status|priority|state|stage)$/i;
 
-// Whole-header match for headers that imply a multi-value column
 export const MULTI_SELECT_KEYWORDS =
   /^(tags?|labels?|categories|category|keywords?)$/i;
 
-// Whole-header match for headers that imply a date column
 export const DATE_KEYWORDS =
   /^(date|dates|due\s*date|due|duedate|deadline|deadlines|scheduled?|schedule|created(\s*at)?|updated(\s*at)?|modified(\s*at)?|start(\s*date)?|end(\s*date)?|target(\s*date)?|completed(\s*at)?|closed(\s*at)?|published(\s*at)?|release(\s*date)?|day|timestamp)$/i;
 
@@ -100,30 +98,39 @@ export function stripTypeAnnotation(name: string): string {
 export function formatColumnHeader(
   name: string,
   type: ColumnType,
-  dateFormat?: DateFormatOption
+  dateFormat?: DateFormatOption,
+  options: { explicit?: boolean; calculation?: CalculationType } = {}
 ): string {
   const cleanName = stripTypeAnnotation(name);
-  if (type === "text") {
-    if (
-      SINGLE_SELECT_KEYWORDS.test(cleanName) ||
-      MULTI_SELECT_KEYWORDS.test(cleanName) ||
-      DATE_KEYWORDS.test(cleanName)
-    ) {
-      return `${cleanName} [text]`;
+  const calculation =
+    options.calculation && options.calculation !== "none" ? options.calculation : undefined;
+
+  // An un-annotated header is re-detected from its values on every render, so
+  // a type the user picked by hand has to be written down to survive — and a
+  // calculation has nowhere to live without one.
+  if (!options.explicit && !calculation) {
+    if (type === "text") {
+      const wouldBeDetectedAsAnotherType =
+        SINGLE_SELECT_KEYWORDS.test(cleanName) ||
+        MULTI_SELECT_KEYWORDS.test(cleanName) ||
+        DATE_KEYWORDS.test(cleanName);
+      if (!wouldBeDetectedAsAnotherType) return cleanName;
+    } else if (type === "select" && SINGLE_SELECT_KEYWORDS.test(cleanName)) {
+      return cleanName;
     }
-    return cleanName;
   }
 
-  if (SINGLE_SELECT_KEYWORDS.test(cleanName) && type === "select") {
-    return cleanName;
-  }
-
+  const params: string[] = [];
   if (type === "date") {
-    const fmt = dateFormat || "YYYY-MM-DD";
-    return `${cleanName} [date:${fmt}]`;
+    params.push(dateFormat || "YYYY-MM-DD");
+  }
+  if (calculation) {
+    params.push(calculation);
   }
 
-  return `${cleanName} [${type}]`;
+  return params.length > 0
+    ? `${cleanName} [${type}:${params.join(",")}]`
+    : `${cleanName} [${type}]`;
 }
 
 export function applyAddColumn(
@@ -194,7 +201,16 @@ export function applyRenameColumn(
     }
   }
 
-  const headerText = formatColumnHeader(cleanName, targetType, targetDateFormat || col?.dateFormat);
+  const hadExplicitType = TYPE_ANNOTATION_REGEX.test(tableData.headers[colIndex] ?? "");
+  const headerText = formatColumnHeader(
+    cleanName,
+    targetType,
+    targetDateFormat || col?.dateFormat,
+    {
+      explicit: hadExplicitType || Boolean(explicitTypeMatch),
+      calculation: col?.calculation,
+    }
+  );
   if (colIndex >= 0 && colIndex < tableData.headers.length) {
     tableData.headers[colIndex] = headerText;
   }
@@ -230,10 +246,18 @@ export function applyChangeColumnType(
     delete col.dateFormat;
   }
 
+  // "Sum" makes no sense on a checkbox, so an incompatible one is dropped.
+  if (!isCalculationAllowedFor(newType, col.calculation)) {
+    delete col.calculation;
+  }
+
   const cleanName = stripTypeAnnotation(col.name);
   col.name = cleanName;
 
-  const headerText = formatColumnHeader(cleanName, newType, col.dateFormat);
+  const headerText = formatColumnHeader(cleanName, newType, col.dateFormat, {
+    explicit: true,
+    calculation: col.calculation,
+  });
   if (colIndex >= 0 && colIndex < tableData.headers.length) {
     tableData.headers[colIndex] = headerText;
   }
@@ -254,7 +278,9 @@ export function applyChangeColumnDateFormat(
   const cleanName = stripTypeAnnotation(col.name);
   col.name = cleanName;
 
-  const headerText = formatColumnHeader(cleanName, "date", newDateFormat);
+  const headerText = formatColumnHeader(cleanName, "date", newDateFormat, {
+    calculation: col.calculation,
+  });
   if (colIndex >= 0 && colIndex < tableData.headers.length) {
     tableData.headers[colIndex] = headerText;
   }
@@ -287,6 +313,32 @@ export function applyDeleteColumn(
   if (colIndex >= 0 && colIndex < columns.length) {
     columns.splice(colIndex, 1);
     columns.forEach((c, idx) => (c.index = idx));
+  }
+}
+
+export function applyChangeColumnCalculation(
+  tableData: MarkdownTableData,
+  columns: TableColumn[],
+  colIndex: number,
+  calculation: CalculationType
+): void {
+  const col = columns[colIndex];
+  if (!col) return;
+
+  if (calculation === "none") {
+    delete col.calculation;
+  } else {
+    col.calculation = calculation;
+  }
+
+  const hadExplicitType = TYPE_ANNOTATION_REGEX.test(tableData.headers[colIndex] ?? "");
+  const headerText = formatColumnHeader(col.name, col.type, col.dateFormat, {
+    explicit: hadExplicitType,
+    calculation: col.calculation,
+  });
+
+  if (colIndex >= 0 && colIndex < tableData.headers.length) {
+    tableData.headers[colIndex] = headerText;
   }
 }
 

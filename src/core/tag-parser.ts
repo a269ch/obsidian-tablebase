@@ -17,7 +17,6 @@ export function parseCellTags(
   const rawTags: string[] = [];
 
   if (trimmed.includes("[[") && trimmed.includes("]]")) {
-    // [[Target]] or [[Target|Alias]] -> group 1 captures the target, alias discarded
     const wikilinkRegex = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g;
     let match: RegExpExecArray | null;
     while ((match = wikilinkRegex.exec(trimmed)) !== null) {
@@ -27,9 +26,7 @@ export function parseCellTags(
     }
   }
 
-  // Detects a mid-string hashtag (space followed by # and a Latin/Cyrillic word character)
   if (rawTags.length === 0 && (trimmed.startsWith("#") || /\s#[a-zA-Z0-9_\-\u0400-\u04FF]/.test(trimmed))) {
-    // Unicode-aware hashtag body: any letter or number, plus underscore and dash
     const hashtagRegex = /#([\p{L}\p{N}_-]+)/gu;
     let match: RegExpExecArray | null;
     while ((match = hashtagRegex.exec(trimmed)) !== null) {
@@ -40,7 +37,6 @@ export function parseCellTags(
   }
 
   if (rawTags.length === 0) {
-    // Matches comma or semicolon tag delimiters
     const parts = trimmed.split(/[,;]/);
     for (const part of parts) {
       const clean = part.trim();
@@ -89,7 +85,6 @@ export function formatTagsToCell(
     case "wikilink":
       return names.map((name) => `[[${name}]]`).join(", ");
     case "hashtag":
-      // Replaces whitespace sequences with underscores for valid hashtag identifiers
       return names
         .map((name) => `#${name.replace(/\s+/g, "_")}`)
         .join(" ");
@@ -121,7 +116,9 @@ export function looksLikeMultiSelect(
     if (!val || val.trim() === "") continue;
     totalNonEmpty++;
     const tags = parseCellTags(val);
-    if (tags.length > 1 || val.includes(",") || val.includes("[[") || val.startsWith("#")) {
+    // A lone "[[Page]]" is a link to one note, not a list of tags; cells that
+    // really hold several of them are caught by the tag count above.
+    if (tags.length > 1 || val.includes(",") || val.startsWith("#")) {
       multiCount++;
     }
   }

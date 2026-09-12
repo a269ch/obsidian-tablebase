@@ -62,4 +62,46 @@ describe("SelectionModel", () => {
     expect(selection.isRowHighlighted(1)).toBe(false);
     expect(selection.isColumnHighlighted(1)).toBe(false);
   });
+
+  it("should round-trip a selection through serialize and restore", () => {
+    const selection = new SelectionModel();
+    selection.focusCell(3, 2);
+    expect(selection.serialize()).toEqual({ kind: "cell", row: 3, col: 2 });
+
+    selection.focusRow(1);
+    expect(selection.serialize()).toEqual({ kind: "row", row: 1 });
+
+    selection.focusColumn(4);
+    expect(selection.serialize()).toEqual({ kind: "column", col: 4 });
+
+    selection.clear();
+    expect(selection.serialize()).toBeUndefined();
+
+    const restored = new SelectionModel();
+    restored.restore({ kind: "cell", row: 3, col: 2 });
+    expect(restored.isCellFocused(3, 2)).toBe(true);
+
+    restored.restore({ kind: "row", row: 5 });
+    expect(restored.isRowFocused(5)).toBe(true);
+
+    restored.restore({ kind: "column", col: 6 });
+    expect(restored.isColumnFocused(6)).toBe(true);
+  });
+
+  it("should clear the selection for missing or malformed snapshots", () => {
+    const selection = new SelectionModel();
+
+    selection.focusCell(1, 1);
+    selection.restore(undefined);
+    expect(selection.isEmpty()).toBe(true);
+
+    selection.focusCell(1, 1);
+    selection.restore({ kind: "cell", row: 2 });
+    expect(selection.isEmpty()).toBe(true);
+
+    selection.focusCell(1, 1);
+    selection.restore({ kind: "row" });
+    expect(selection.isEmpty()).toBe(true);
+  });
+
 });

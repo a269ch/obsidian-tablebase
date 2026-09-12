@@ -25,6 +25,7 @@ function createActions(): TableViewActions {
     onColumnTypeChange: vi.fn(noop),
     onColumnDateFormatChange: vi.fn(noop),
     onColumnAlignmentChange: vi.fn(noop),
+    onColumnCalculationChange: vi.fn(noop),
     onReorderColumns: vi.fn(noop),
     onFilterChange: vi.fn(),
     onSortChange: vi.fn(),
@@ -311,7 +312,9 @@ describe("Row drag reordering", () => {
 
     grid.render(containerEl);
 
-    const indexTds = containerEl.querySelectorAll("td.ms-db-td-index:not(.ms-db-add-row-index-td)");
+    const indexTds = containerEl.querySelectorAll(
+      "td.ms-db-td-index:not(.ms-db-add-row-index-td):not(.ms-calc-index)"
+    );
     expect(indexTds.length).toBe(2);
 
     const firstTd = indexTds[0] as HTMLElement;

@@ -3,7 +3,6 @@ import { closeAllFloatingPopovers } from "../popover";
 import { CellRenderer } from "./cells";
 import { TableViewContext } from "./types";
 
-// Matches numeric keys: digits, decimal separators, or minus sign
 const NUMERIC_INPUT_KEY = /^[0-9.,-]$/;
 
 const OUTSIDE_CLICK_EXEMPT_SELECTORS = [

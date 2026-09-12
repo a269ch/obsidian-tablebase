@@ -55,7 +55,6 @@ export function parseDateByOption(
   const delimiter = format.includes("/") ? "/" : format.includes(".") ? "." : "-";
   if (s.includes(delimiter)) {
     const parts = s.split(delimiter);
-    // Matches segments containing one or more digits only
     if (
       parts.length === 3 &&
       /^\d+$/.test(parts[0]) &&
