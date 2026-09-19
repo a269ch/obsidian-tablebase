@@ -24,6 +24,7 @@ import { TableViewActions, TableViewContext, TableViewOptions } from "./types";
 
 export class NotionTableView implements Disposable, TableViewContext {
   public readonly app: App;
+  public readonly sourcePath: string;
   public readonly actions: TableViewActions;
   public readonly selection = new SelectionModel();
   public readonly registry = new DisposableRegistry();
@@ -44,10 +45,14 @@ export class NotionTableView implements Disposable, TableViewContext {
   constructor(options: TableViewOptions) {
     this.options = options;
     this.app = options.app;
+    this.sourcePath = options.sourcePath;
     this.actions = options.actions;
 
     this.options.filterState.viewType ??= "table";
     this.options.filterState.hiddenColumnIndices ??= [];
+    // Obsidian rebuilds the view on every file change; the shared filter state
+    // is what carries the selection across those rebuilds.
+    this.selection.restore(this.options.filterState.selection);
 
     this.containerEl = createDiv({ cls: "ms-notion-database-container" });
     this.containerEl.tabIndex = 0;
@@ -147,6 +152,7 @@ export class NotionTableView implements Disposable, TableViewContext {
   }
 
   public applySelection(): void {
+    this.filterState.selection = this.selection.serialize();
     this.selection.applyTo(this.containerEl);
   }
 
@@ -181,6 +187,7 @@ export class NotionTableView implements Disposable, TableViewContext {
   private renderBoard(): void {
     const kanban = new KanbanView({
       app: this.app,
+      sourcePath: this.sourcePath,
       tableData: this.tableData,
       columns: this.columns,
       filterState: this.filterState,

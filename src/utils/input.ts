@@ -10,7 +10,6 @@ const NAVIGATION_KEYS = new Set<string>([
   "End",
 ]);
 
-// Matches a single digit 0-9
 const SINGLE_DIGIT = /^[0-9]$/;
 
 export function attachStrictNumericInputHandlers(input: HTMLInputElement): void {

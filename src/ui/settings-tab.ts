@@ -68,6 +68,22 @@ export class TableBaseSettingTab extends PluginSettingTab {
         },
       },
       {
+        name: "Show the calculation row",
+        desc: "Keep a summary row under every table: hover it to pick Sum, Average, Count and the rest.",
+        control: {
+          type: "toggle",
+          key: "enableCalculations",
+        },
+      },
+      {
+        name: "Show empty properties on board cards",
+        desc: "Display placeholders for empty fields on Kanban cards so they can be filled in. Checkboxes are always shown.",
+        control: {
+          type: "toggle",
+          key: "showEmptyBoardProperties",
+        },
+      },
+      {
         name: "Custom tag colors",
         desc: "Customize colors for specific tags. These override automatic colors across all tables and boards.",
       },
@@ -212,6 +228,32 @@ export class TableBaseSettingTab extends PluginSettingTab {
           .setValue(settings.showRowNumbers ?? false)
           .onChange(async (value) => {
             await this.settingsService.updateSettings({ showRowNumbers: value });
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Show the calculation row")
+      .setDesc(
+        "Keep a summary row under every table: hover it to pick Sum, Average, Count and the rest."
+      )
+      .addToggle((toggle) =>
+        toggle
+          .setValue(settings.enableCalculations ?? true)
+          .onChange(async (value) => {
+            await this.settingsService.updateSettings({ enableCalculations: value });
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Show empty properties on board cards")
+      .setDesc(
+        "Display placeholders for empty fields on Kanban cards so they can be filled in. Checkboxes are always shown."
+      )
+      .addToggle((toggle) =>
+        toggle
+          .setValue(settings.showEmptyBoardProperties ?? false)
+          .onChange(async (value) => {
+            await this.settingsService.updateSettings({ showEmptyBoardProperties: value });
           })
       );
   }

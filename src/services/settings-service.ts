@@ -21,7 +21,6 @@ export class SettingsService {
       const data = await this.storage.loadData();
       this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
       if (Array.isArray(this.settings.multiSelectColumnNames)) {
-        // Cyrillic unicode range \u0400-\u04FF
         const cyrillicPattern = /[\u0400-\u04FF]/;
         this.settings.multiSelectColumnNames = this.settings.multiSelectColumnNames.filter(
           (name) => !cyrillicPattern.test(name)
@@ -79,9 +78,7 @@ export class SettingsService {
     for (const listener of this.listeners) {
       try {
         listener(this.settings);
-      } catch {
-        // Suppress listener error to prevent disrupting subsequent listeners
-      }
+      } catch { /* listener errors must not break the notification loop */ }
     }
   }
 }

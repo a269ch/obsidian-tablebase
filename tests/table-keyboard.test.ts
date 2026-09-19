@@ -23,6 +23,7 @@ function createActions(): TableViewActions {
     onColumnTypeChange: vi.fn(noop),
     onColumnDateFormatChange: vi.fn(noop),
     onColumnAlignmentChange: vi.fn(noop),
+    onColumnCalculationChange: vi.fn(noop),
     onReorderColumns: vi.fn(noop),
     onFilterChange: vi.fn(),
     onSortChange: vi.fn(),
@@ -37,6 +38,7 @@ function createContext(tableData: MarkdownTableData, columns: TableColumn[]) {
   const actions = createActions();
   const ctx: TableViewContext = {
     app: {} as App,
+    sourcePath: "notes/test.md",
     actions,
     selection: new SelectionModel(),
     registry: new DisposableRegistry(),
@@ -224,8 +226,10 @@ describe("TableKeyboardController", () => {
     keyboard.bind();
 
     ctx.selection.focusCell(0, 0);
-    containerEl.dispatchEvent(new KeyboardEvent("keydown", { key: "a", bubbles: true }));
+    const keyEvent = new KeyboardEvent("keydown", { key: "a", bubbles: true, cancelable: true });
+    containerEl.dispatchEvent(keyEvent);
 
+    expect(keyEvent.defaultPrevented).toBe(true);
     expect(mockCells.startInlineEditing).toHaveBeenCalledWith(td0, 0, 0, "", "a");
   });
 });

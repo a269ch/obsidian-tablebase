@@ -33,6 +33,7 @@ function createActions(): TableViewActions {
     onColumnTypeChange: vi.fn(noop),
     onColumnDateFormatChange: vi.fn(noop),
     onColumnAlignmentChange: vi.fn(noop),
+    onColumnCalculationChange: vi.fn(noop),
     onReorderColumns: vi.fn(noop),
     onFilterChange: vi.fn(),
     onSortChange: vi.fn(),
@@ -47,6 +48,7 @@ function createContext(tableData: MarkdownTableData, columns: TableColumn[]) {
   const actions = createActions();
   const ctx: TableViewContext = {
     app: {} as App,
+    sourcePath: "notes/test.md",
     actions,
     selection: new SelectionModel(),
     registry: new DisposableRegistry(),

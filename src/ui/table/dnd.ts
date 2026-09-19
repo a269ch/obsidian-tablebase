@@ -7,7 +7,7 @@ import { TableMenus } from "./menus";
 import { TableViewContext } from "./types";
 
 const ROW_MIME_TYPE = "application/x-obsidian-table-row";
-const HANDLE_HIDE_DELAY_MS = 150;
+const HANDLE_HIDE_DELAY_MS = 300;
 const HANDLE_HEIGHT = 24;
 const MIN_COLUMN_WIDTH = 60;
 
@@ -16,6 +16,9 @@ const DROP_TARGET_CLASSES = [
   "is-row-drop-target-bottom",
   "is-row-drop-target",
 ];
+
+const COLUMN_DROP_CLASSES = ["is-col-drop-before", "is-col-drop-after"];
+const COLUMN_DRAG_CLASSES = ["is-dragging-col", ...COLUMN_DROP_CLASSES];
 
 export class RowDragController implements Disposable {
   private ctx: TableViewContext;
@@ -88,7 +91,7 @@ export class RowDragController implements Disposable {
 
     registry.listen(this.ctx.containerEl, "mouseleave", (e: MouseEvent) => {
       const related = e.relatedTarget as Node | null;
-      if (related && this.handleEl.contains(related)) return;
+      if (related && (this.handleEl === related || this.handleEl.contains(related))) return;
       this.scheduleHide();
     });
 
@@ -312,7 +315,7 @@ export class RowDragController implements Disposable {
 
     tr.addEventListener("mouseleave", (e) => {
       const related = e.relatedTarget as Node | null;
-      if (related && this.handleEl.contains(related)) return;
+      if (related && (this.handleEl === related || this.handleEl.contains(related))) return;
       this.scheduleHide();
     });
 
@@ -451,7 +454,38 @@ export class ColumnDragController {
     return this.suppressClickUntilDragEnds;
   }
 
-  public attachHeader(th: HTMLElement, columnIndex: number, headerRow: HTMLElement): void {
+  private columnCells(columnIndex: number): HTMLElement[] {
+    return Array.from(
+      this.ctx.containerEl.querySelectorAll<HTMLElement>(
+        `[data-col-index="${columnIndex}"]`
+      )
+    );
+  }
+
+  private clearColumnDragClasses(): void {
+    this.ctx.containerEl
+      .querySelectorAll(`.${COLUMN_DRAG_CLASSES.join(", .")}`)
+      .forEach((el) => el.classList.remove(...COLUMN_DRAG_CLASSES));
+  }
+
+  private markDropTarget(columnIndex: number): void {
+    if (this.draggedColumnIndex === null) return;
+
+    // applyReorderColumns splices the column out and back in, so a column
+    // dragged rightwards lands after the target and leftwards before it.
+    const side =
+      this.draggedColumnIndex < columnIndex ? "is-col-drop-after" : "is-col-drop-before";
+
+    this.ctx.containerEl
+      .querySelectorAll(`.${COLUMN_DROP_CLASSES.join(", .")}`)
+      .forEach((el) => el.classList.remove(...COLUMN_DROP_CLASSES));
+
+    for (const cell of this.columnCells(columnIndex)) {
+      cell.classList.add(side);
+    }
+  }
+
+  public attachHeader(th: HTMLElement, columnIndex: number): void {
     th.setAttribute("draggable", "true");
 
     th.addEventListener("dragstart", (e) => {
@@ -462,18 +496,17 @@ export class ColumnDragController {
         e.dataTransfer.setData("text/col", `${columnIndex}`);
         e.dataTransfer.setData("text/plain", `${columnIndex}`);
       }
-      th.classList.add("is-dragging-col");
+      for (const cell of this.columnCells(columnIndex)) {
+        cell.classList.add("is-dragging-col");
+      }
     });
 
     th.addEventListener("dragend", () => {
-      th.classList.remove("is-dragging-col");
       this.draggedColumnIndex = null;
       this.ctx.registry.timeout(() => {
         this.suppressClickUntilDragEnds = false;
       }, 100);
-      headerRow
-        .querySelectorAll(".is-col-drop-target")
-        .forEach((el) => el.classList.remove("is-col-drop-target"));
+      this.clearColumnDragClasses();
     });
 
     th.addEventListener("dragover", (e) => {
@@ -482,19 +515,33 @@ export class ColumnDragController {
       if (e.dataTransfer) {
         e.dataTransfer.dropEffect = "move";
       }
-      th.classList.add("is-col-drop-target");
+      this.markDropTarget(columnIndex);
     });
 
-    th.addEventListener("dragleave", () => {
-      th.classList.remove("is-col-drop-target");
+    th.addEventListener("dragleave", (e) => {
+      const rect = th.getBoundingClientRect();
+      if (
+        e.clientX >= rect.left &&
+        e.clientX <= rect.right &&
+        e.clientY >= rect.top &&
+        e.clientY <= rect.bottom
+      ) {
+        return;
+      }
+      for (const cell of this.columnCells(columnIndex)) {
+        cell.classList.remove(...COLUMN_DROP_CLASSES);
+      }
     });
 
     th.addEventListener("drop", (e) => {
-      th.classList.remove("is-col-drop-target");
-      if (this.draggedColumnIndex === null || this.draggedColumnIndex === columnIndex) return;
+      if (this.draggedColumnIndex === null || this.draggedColumnIndex === columnIndex) {
+        this.clearColumnDragClasses();
+        return;
+      }
       e.preventDefault();
       const fromIndex = this.draggedColumnIndex;
       this.draggedColumnIndex = null;
+      this.clearColumnDragClasses();
       void this.ctx.actions.onReorderColumns(fromIndex, columnIndex);
     });
   }

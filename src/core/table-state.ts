@@ -1,4 +1,5 @@
 import {
+  CalculationType,
   ColumnAlignment,
   ColumnType,
   DateFormatOption,
@@ -10,6 +11,7 @@ import {
   TableColumn,
   TableFilterState,
 } from "../types";
+import { isCalculationType } from "./calculation-engine";
 import { parseColumnAlignment } from "./markdown-parser";
 import { isCellChecked, parseCellNumber } from "./sort-engine";
 import { parseCellTags, looksLikeMultiSelect } from "./tag-parser";
@@ -45,15 +47,29 @@ export class TableStateManager {
       let inferredType: ColumnType = "text";
       let cleanHeaderName = stripTypeAnnotation(rawHeader);
       let columnDateFormat: DateFormatOption | undefined;
+      let columnCalculation: CalculationType | undefined;
 
       const typeTagMatch = rawHeader.match(TYPE_ANNOTATION_REGEX);
       if (typeTagMatch) {
         inferredType = typeTagMatch[1].toLowerCase() as ColumnType;
+
+        // "[date:DD.MM.YYYY,sum]" — the annotation carries the date format and
+        // the footer calculation in any order.
+        let annotatedFormat: DateFormatOption | undefined;
+        for (const param of (typeTagMatch[2] || "").split(",")) {
+          const value = param.trim();
+          if (!value) continue;
+          if (isCalculationType(value.toLowerCase())) {
+            columnCalculation = value.toLowerCase() as CalculationType;
+          } else if (KNOWN_DATE_FORMATS.has(value.toUpperCase())) {
+            annotatedFormat = value.toUpperCase() as DateFormatOption;
+          }
+        }
+
         if (inferredType === "date") {
-          const rawFmt = (typeTagMatch[2] || "").trim().toUpperCase();
           columnDateFormat =
             settings.dateFormat ||
-            (KNOWN_DATE_FORMATS.has(rawFmt) ? (rawFmt as DateFormatOption) : undefined) ||
+            annotatedFormat ||
             this.inferDateFormatFromCells(columnCells) ||
             "YYYY-MM-DD";
         }
@@ -110,6 +126,9 @@ export class TableStateManager {
         type: inferredType,
         align,
         dateFormat: columnDateFormat,
+        ...(columnCalculation && columnCalculation !== "none"
+          ? { calculation: columnCalculation }
+          : {}),
         uniqueTags: Array.from(tagMap.values()),
       });
     }
@@ -124,7 +143,6 @@ export class TableStateManager {
     });
     for (const raw of nonBlank) {
       const c = raw.trim();
-      // Each pattern pins a fully zero-padded date shape to one supported format
       if (/^\d{4}-\d{2}-\d{2}$/.test(c)) return "YYYY-MM-DD";
       if (/^\d{2}\.\d{2}\.\d{4}$/.test(c)) return "DD.MM.YYYY";
       if (/^\d{4}\/\d{2}\/\d{2}$/.test(c)) return "YYYY/MM/DD";
@@ -148,9 +166,7 @@ export class TableStateManager {
 
     return nonBlank.every((c) => {
       const trimmed = c.trim();
-      // Optional sign/currency, digits, optional decimal part, optional percent
       const isPlainNumber = /^[+-]?\$?\d+([.,]\d+)?%?$/.test(trimmed);
-      // Otherwise accept parseable numbers only when free of Latin/Cyrillic letters
       const hasLetters = /[a-zA-Z\u0400-\u04FF]/.test(trimmed);
       return isPlainNumber || (!isNaN(parseCellNumber(trimmed)) && !hasLetters);
     });
@@ -162,7 +178,6 @@ export class TableStateManager {
       return t.length > 0 && t !== "-" && t !== "n/a" && t !== "none" && t !== "null";
     });
     if (nonBlank.length === 0) return false;
-    // Year-first or day-first dates separated by dash, dot or slash
     const dateRegex = /^\d{4}[-./]\d{1,2}[-./]\d{1,2}$|^\d{1,2}[-./]\d{1,2}[-./]\d{2,4}$/;
     return nonBlank.every((c) => dateRegex.test(c.trim()));
   }
@@ -209,7 +224,6 @@ export class TableStateManager {
     commentText: string,
     tableId: string
   ): TableFilterState | null {
-    // HTML comment marker "<!-- ms-filter: {...} -->" with the JSON payload in group 1
     const match = commentText.match(/<!--\s*ms-filter:\s*(\{.*\})\s*-->/);
     if (!match) return null;
 
