@@ -14,7 +14,7 @@ import {
 } from "../types";
 import { appendIcon, appendIconLabel } from "../utils/dom";
 import { attachStrictNumericInputHandlers, sanitizeNumericCellValue } from "../utils/input";
-import { renderTextWithLinks } from "../utils/link-renderer";
+import { renderTextWithLinks, stripCodeSpans } from "../utils/link-renderer";
 import {
   ICON_CHECK_SQUARE,
   ICON_DUPLICATE,
@@ -150,7 +150,7 @@ export class KanbanView {
       groups.set(CHECKED_GROUP, []);
 
       for (const row of visibleRows) {
-        const cellValue = (row.cells[this.groupByColIndex] || "").trim();
+        const cellValue = stripCodeSpans(row.cells[this.groupByColIndex] || "").trim();
         const key = isCellChecked(cellValue) ? CHECKED_GROUP : UNCHECKED_GROUP;
         groups.get(key)?.push(row);
       }
@@ -165,7 +165,7 @@ export class KanbanView {
     }
 
     for (const row of visibleRows) {
-      const cellValue = (row.cells[this.groupByColIndex] || "").trim();
+      const cellValue = stripCodeSpans(row.cells[this.groupByColIndex] || "").trim();
       if (!cellValue) {
         noStatusRows.push(row);
         continue;
@@ -570,7 +570,7 @@ export class KanbanView {
       // property name.
       badge.addClass("is-number");
       badge.createSpan({ cls: "ms-kanban-prop-name", text: col.name });
-      badge.createSpan({ cls: "ms-kanban-prop-value", text: cellValue });
+      badge.createSpan({ cls: "ms-kanban-prop-value", text: stripCodeSpans(cellValue) });
       return;
     }
 

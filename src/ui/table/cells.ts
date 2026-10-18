@@ -4,7 +4,7 @@ import { parseCellTags } from "../../core/tag-parser";
 import { ColumnAlignment, MarkdownTableRow, TableColumn } from "../../types";
 import { appendIcon } from "../../utils/dom";
 import { attachStrictNumericInputHandlers, sanitizeNumericCellValue } from "../../utils/input";
-import { renderTextWithLinks } from "../../utils/link-renderer";
+import { renderTextWithLinks, stripCodeSpans } from "../../utils/link-renderer";
 import { ICON_TYPE_DATE } from "../icons";
 import { DatePickerPopover } from "../modals/date-picker-popover";
 import { SingleSelectPopover } from "../modals/single-select-popover";
@@ -193,13 +193,13 @@ export class CellRenderer {
     colIndex: number,
     rawValue: string
   ): void {
-    const isNumber = col.type === "number" || isNumericCell(rawValue);
+    const isNumber = col.type === "number" || isNumericCell(stripCodeSpans(rawValue));
     const wrapper = td.createDiv({
       cls: `ms-cell-text-wrapper ${isNumber ? "is-number" : ""}`,
     });
 
     if (isNumber) {
-      wrapper.textContent = rawValue;
+      wrapper.textContent = stripCodeSpans(rawValue);
     } else {
       renderTextWithLinks(wrapper, rawValue, {
         onExternalClick: (url, e) => {
@@ -307,7 +307,7 @@ export class CellRenderer {
     td.classList.add("is-editing");
 
     const col = this.ctx.columns[colIndex];
-    const isNumber = col?.type === "number" || isNumericCell(currentValue);
+    const isNumber = col?.type === "number" || isNumericCell(stripCodeSpans(currentValue));
     const alignment = col ? resolveColumnAlignment(col) : (isNumber ? "right" : "left");
 
     const input = td.createEl("input", {
