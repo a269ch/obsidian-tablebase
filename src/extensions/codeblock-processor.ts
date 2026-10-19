@@ -35,6 +35,7 @@ export class TableCodeBlockProcessor {
       sourcePath: ctx.sourcePath,
       tableData: tables[0],
       initialSource: source,
+      getLineStart: () => ctx.getSectionInfo(el)?.lineStart,
     });
 
     const viewEl = view.getElement();
