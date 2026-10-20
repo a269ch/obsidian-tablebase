@@ -53,10 +53,24 @@ describe("TableBaseSettingTab", () => {
     const toggles = tab.containerEl.querySelectorAll<HTMLElement>(".checkbox-container");
     expect(toggles.length).toBeGreaterThan(0);
 
-    const autoDetectToggle = toggles[0];
+    const autoDetectToggle = toggles[1];
     autoDetectToggle.click();
 
     expect(settingsService.getSettings().autoDetectMultiSelect).toBe(false);
+  });
+
+  it("should update autoConvertMarkdownTables when its toggle is clicked", async () => {
+    const plugin = createMockPlugin();
+    const settingsService = new SettingsService(plugin);
+    await settingsService.loadSettings();
+
+    const tab = new TableBaseSettingTab({} as App, plugin, settingsService);
+    tab.display();
+
+    const toggles = tab.containerEl.querySelectorAll<HTMLElement>(".checkbox-container");
+    toggles[0].click();
+
+    expect(settingsService.getSettings().autoConvertMarkdownTables).toBe(false);
   });
 
   it("should update multiSelectColumnNames when textarea changes", async () => {
@@ -106,7 +120,7 @@ describe("TableBaseSettingTab", () => {
     tab.display();
 
     const toggles = tab.containerEl.querySelectorAll<HTMLElement>(".checkbox-container");
-    const rowNumberToggle = toggles[1];
+    const rowNumberToggle = toggles[2];
     expect(rowNumberToggle).toBeDefined();
 
     rowNumberToggle.click();

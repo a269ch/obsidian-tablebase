@@ -121,7 +121,14 @@ describe("changing a column type from the header menu", () => {
       "",
     ].join("\n");
 
-    const processor = new TablePostProcessor(controller, new TableViewRegistry());
+    const processor = new TablePostProcessor(
+      controller,
+      new TableViewRegistry(),
+      new SettingsService({
+        loadData: async () => null,
+        saveData: async () => undefined,
+      })
+    );
     const ctx = {
       docId: "doc",
       sourcePath: "Notes/Test.md",
