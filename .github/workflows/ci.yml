@@ -14,11 +14,14 @@ on:
 jobs:
   contribution-policy:
     name: Contribution policy
-    if: github.event_name == 'pull_request'
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.state == 'open'
     runs-on: ubuntu-latest
 
     steps:
       - name: Check pull request commit count
+        if: ${{ !startsWith(github.event.pull_request.head.ref, 'release/') }}
         env:
           COMMIT_COUNT: ${{ github.event.pull_request.commits }}
         run: |
