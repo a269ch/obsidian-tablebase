@@ -607,8 +607,8 @@ input[type="text"].ms-filter-value-input:focus {
 }
 
 .ms-db-grid-table {
-  width: max-content;
-  min-width: 0;
+  width: 100%;
+  min-width: 100%;
   border-collapse: separate;
   border-spacing: 0;
   table-layout: auto;
@@ -1201,6 +1201,7 @@ input[type="text"].ms-filter-value-input:focus {
   min-height: 20px;
   line-height: 1.4;
   word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .ms-cell-text-wrapper.is-number {

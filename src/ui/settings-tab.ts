@@ -21,6 +21,14 @@ export class TableBaseSettingTab extends PluginSettingTab {
 
     return [
       {
+        name: "Auto-convert Markdown tables",
+        desc: "Automatically convert standard Markdown tables into interactive TableBase tables.",
+        control: {
+          type: "toggle",
+          key: "autoConvertMarkdownTables",
+        },
+      },
+      {
         name: "Auto-detect multi-select columns",
         desc: "Automatically detect multi-select columns by analyzing cell values (lists, wikilinks, tags).",
         control: {
@@ -148,6 +156,19 @@ export class TableBaseSettingTab extends PluginSettingTab {
   private renderColumnDetection(containerEl: HTMLElement): void {
     const settings = this.settingsService.getSettings();
     this.addHeading(containerEl, "Column detection");
+
+    new Setting(containerEl)
+      .setName("Auto-convert Markdown tables")
+      .setDesc(
+        "Automatically convert standard Markdown tables into interactive TableBase tables."
+      )
+      .addToggle((toggle) =>
+        toggle
+          .setValue(settings.autoConvertMarkdownTables)
+          .onChange(async (value) => {
+            await this.settingsService.updateSettings({ autoConvertMarkdownTables: value });
+          })
+      );
 
     new Setting(containerEl)
       .setName("Auto-detect multi-select columns")
