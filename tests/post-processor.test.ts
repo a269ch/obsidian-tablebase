@@ -64,7 +64,7 @@ function createProcessor(sectionInfo?: SectionSource): {
     new TableSyncService(new VaultService(app))
   );
 
-  const processor = new TablePostProcessor(controller, new TableViewRegistry());
+  const processor = new TablePostProcessor(controller, new TableViewRegistry(), settingsService);
 
   const ctx = {
     docId: "doc",
@@ -108,6 +108,18 @@ describe("TablePostProcessor date columns", () => {
     expect(addColTh).not.toBeNull();
     expect(addColTh?.querySelector(".ms-db-th-add-col-content")).not.toBeNull();
     expect(addColTh?.querySelector(".ms-db-th-add-col-icon svg")).not.toBeNull();
+  });
+
+  it("should skip standard Markdown tables when auto-conversion is disabled", async () => {
+    const { processor, ctx, settingsService } = createProcessor();
+    await settingsService.updateSettings({ autoConvertMarkdownTables: false });
+    const wrapper = buildRenderedTable(["Task"], [["Buy bread"]]);
+
+    processor.process(wrapper, ctx);
+
+    expect(wrapper.querySelector(".ms-notion-database-container")).toBeNull();
+    expect(wrapper.querySelector("table")).not.toBeNull();
+    expect(ctx.addChild).not.toHaveBeenCalled();
   });
 
   it("should register the view for lifecycle teardown", () => {

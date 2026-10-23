@@ -2,12 +2,56 @@ name: CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches:
+      - main
+      - 'release/**'
   pull_request:
-    branches: [ main, master ]
+    branches:
+      - main
+      - 'release/**'
   workflow_dispatch:
 
 jobs:
+  contribution-policy:
+    name: Contribution policy
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check pull request commit count
+        env:
+          COMMIT_COUNT: ${{ github.event.pull_request.commits }}
+        run: |
+          if [ "$COMMIT_COUNT" -ne 1 ]; then
+            echo "::error::Pull requests must contain exactly one commit; found $COMMIT_COUNT."
+            exit 1
+          fi
+
+      - name: Check commit message format
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Validate commit message
+        run: |
+          subject="$(git log -1 --format=%s)"
+          task_release='^TASK-[0-9]+(, TASK-[0-9]+)*: RELEASE-[0-9]+(\.[0-9]+)*$'
+          task_only='^TASK-[0-9]+$'
+          release_only='^RELEASE-[0-9]+(\.[0-9]+)*$'
+          descriptive='^[A-Za-z][A-Za-z0-9 ():/._-]{5,}$'
+          if [[ "$subject" =~ ^TASK- || "$subject" =~ ^RELEASE- ]]; then
+            [[ "$subject" =~ $task_release || "$subject" =~ $task_only || "$subject" =~ $release_only ]]
+          elif [[ "$subject" =~ $descriptive ]]; then
+            exit 0
+          else
+            false
+          fi
+          if [ "$?" -ne 0 ]; then
+            echo "::error::Commit subject does not follow CONTRIBUTING.md: $subject"
+            exit 1
+          fi
+
   test:
     name: Build & Test
     runs-on: ubuntu-latest
@@ -27,7 +71,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci || npm install
+        run: npm ci
 
       - name: Type check (TypeScript)
         run: npx tsc --noEmit

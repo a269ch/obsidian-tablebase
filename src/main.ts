@@ -40,7 +40,11 @@ export default class TableBasePlugin extends Plugin {
 
     new CommandService(this).registerCommands();
 
-    const postProcessor = new TablePostProcessor(viewController, this.viewRegistry);
+    const postProcessor = new TablePostProcessor(
+      viewController,
+      this.viewRegistry,
+      this.settingsService
+    );
     this.registerMarkdownPostProcessor((el, ctx) => postProcessor.process(el, ctx));
 
     const codeBlockProcessor = new TableCodeBlockProcessor(viewController, this.viewRegistry);
