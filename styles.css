@@ -1207,6 +1207,15 @@ input[type="text"].ms-filter-value-input:focus {
   font-variant-numeric: tabular-nums;
 }
 
+.ms-cell-code {
+  font-family: var(--font-monospace);
+  font-size: var(--code-size);
+  color: var(--code-normal);
+  background-color: var(--code-background);
+  border-radius: var(--code-radius, var(--radius-s));
+  padding: 0.1em 0.25em;
+}
+
 .ms-cell-link {
   color: var(--link-color, var(--text-accent));
   text-decoration: var(--link-decoration, underline);

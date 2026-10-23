@@ -566,6 +566,19 @@ describe("TablePostProcessor source parsing", () => {
     expect(names).toEqual(["Модуль", "Категория"]);
   });
 
+  it("should bring inline code back in cells the renderer flattened", () => {
+    const text = ["| Where | What |", "| --- | --- |", "| Loose in `System/AI` | scripts |"].join("\n");
+
+    const { processor, ctx } = createProcessor({ text, lineStart: 0, lineEnd: 2 });
+    // Obsidian renders the code span as <code>; the cell's text loses the backticks.
+    const wrapper = buildRenderedTable(["Where", "What"], [["Loose in System/AI", "scripts"]]);
+
+    processor.process(wrapper, ctx);
+
+    const cell = wrapper.querySelector<HTMLElement>('.ms-db-td[data-col-index="0"]');
+    expect(cell?.querySelector(".ms-cell-code")?.textContent).toBe("System/AI");
+  });
+
   it("should bring wikilinks back to life in cells the renderer flattened", () => {
     const text = [
       "| Заметка | Проверено |",

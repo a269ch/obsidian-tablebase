@@ -48,6 +48,11 @@ describe("Table Filter Engine", () => {
     },
   ];
 
+  it("should match code cells by the text they show", () => {
+    expect(evaluateRuleOnCell("`Done`", "text", "is_one_of", ["done"])).toBe(true);
+    expect(evaluateRuleOnCell("Loose in `System/AI`", "text", "contains", "in system")).toBe(true);
+  });
+
   describe("Multi-Select Operators on Cells", () => {
     const cellTags = "Frontend, Bug, Urgent";
 
