@@ -23,6 +23,7 @@ describe("SettingsService", () => {
     const loaded = await service.loadSettings();
     expect(loaded.defaultTagFormat).toBe("wikilink");
     expect(loaded.showRowNumbers).toBe(true);
+    expect(loaded.autoConvertMarkdownTables).toBe(true);
     expect(loaded.autoDetectMultiSelect).toBe(DEFAULT_SETTINGS.autoDetectMultiSelect);
     expect(storage.loadData).toHaveBeenCalledOnce();
   });

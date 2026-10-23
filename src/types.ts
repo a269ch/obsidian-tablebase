@@ -157,6 +157,7 @@ export type DateFormatOption =
 export interface PluginSettings {
   defaultTagFormat: TagFormat;
   dateFormat?: DateFormatOption;
+  autoConvertMarkdownTables: boolean;
   autoDetectMultiSelect: boolean;
   multiSelectColumnNames: string[];
   customTagColors: Record<string, TagColor>;
@@ -168,6 +169,7 @@ export interface PluginSettings {
 
 export const DEFAULT_SETTINGS: PluginSettings = {
   defaultTagFormat: "comma",
+  autoConvertMarkdownTables: true,
   autoDetectMultiSelect: true,
   multiSelectColumnNames: [
     "Tags",
