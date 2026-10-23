@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { App } from "obsidian";
-import { parseMarkdownTables } from "../src/core/markdown-parser";
+import { parseMarkdownTables, serializeMarkdownTable } from "../src/core/markdown-parser";
 import { TableStateManager } from "../src/core/table-state";
 import { SettingsService } from "../src/services/settings-service";
 import { TableSyncService } from "../src/services/table-sync-service";
@@ -45,7 +45,57 @@ describe("TableViewController", () => {
     const raw = "| Col A | Col B |\n| --- | --- |\n| 1 | 2 |";
     const tableData: MarkdownTableData = parseMarkdownTables(raw)[0];
 
-    const syncSpy = vi.spyOn(syncService, "syncCodeBlock").mockResolvedValue();
+    const syncSpy = vi.spyOn(syncService, "syncCodeBlock").mockResolvedValue(true);
+
+    const view = controller.createCodeBlockView({
+      sourcePath: "note.md",
+      tableData,
+      initialSource: raw,
+      getLineStart: () => 4,
+    });
+
+    expect(view).not.toBeNull();
+    expect(view.columns).toHaveLength(2);
+
+    await view.actions.onCellUpdate(0, 0, "Updated");
+    expect(syncSpy).toHaveBeenCalledWith("note.md", tableData, raw, 4);
+    const savedSource = serializeMarkdownTable(tableData);
+
+    await view.actions.onCellUpdate(0, 1, "Again");
+    expect(syncSpy).toHaveBeenLastCalledWith("note.md", tableData, savedSource, 4);
+  });
+
+  it("should run overlapping code block saves one at a time", async () => {
+    const raw = "| Col A | Col B |\n| --- | --- |\n| 1 | 2 |";
+    const tableData: MarkdownTableData = parseMarkdownTables(raw)[0];
+    const sources: (string | undefined)[] = [];
+    let release: () => void = () => {};
+
+    vi.spyOn(syncService, "syncCodeBlock").mockImplementation(async (_path, _data, source) => {
+      sources.push(source);
+      if (sources.length === 1) await new Promise<void>((resolve) => (release = resolve));
+      return true;
+    });
+
+    const view = controller.createCodeBlockView({ sourcePath: "note.md", tableData, initialSource: raw });
+
+    const first = view.actions.onCellUpdate(0, 0, "A");
+    await Promise.resolve();
+    const afterFirst = serializeMarkdownTable(tableData);
+    const second = view.actions.onCellUpdate(0, 1, "B");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(sources).toHaveLength(1);
+
+    release();
+    await Promise.all([first, second]);
+    expect(sources).toEqual([raw, afterFirst]);
+  });
+
+  it("should keep the last saved source when a code block save fails", async () => {
+    const raw = "| Col A | Col B |\n| --- | --- |\n| 1 | 2 |";
+    const tableData: MarkdownTableData = parseMarkdownTables(raw)[0];
+
+    const syncSpy = vi.spyOn(syncService, "syncCodeBlock").mockResolvedValue(false);
 
     const view = controller.createCodeBlockView({
       sourcePath: "note.md",
@@ -53,11 +103,9 @@ describe("TableViewController", () => {
       initialSource: raw,
     });
 
-    expect(view).not.toBeNull();
-    expect(view.columns).toHaveLength(2);
-
     await view.actions.onCellUpdate(0, 0, "Updated");
-    expect(syncSpy).toHaveBeenCalledWith("note.md", tableData, raw);
+    await view.actions.onCellUpdate(0, 1, "Again");
+    expect(syncSpy).toHaveBeenLastCalledWith("note.md", tableData, raw, undefined);
   });
 
   it("should create inline table view and dispatch all table mutations to syncInlineTable", async () => {
