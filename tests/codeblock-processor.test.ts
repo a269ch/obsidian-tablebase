@@ -75,6 +75,10 @@ describe("TableCodeBlockProcessor", () => {
       })
     );
 
+    const { getLineStart } = vi.mocked(mockViewController.createCodeBlockView).mock.calls[0][0];
+    (ctx as unknown as { getSectionInfo: () => unknown }).getSectionInfo = () => ({ lineStart: 7 });
+    expect(getLineStart?.()).toBe(7);
+
     expect(el.querySelector(".ms-notion-database-container")).toBe(viewEl);
     expect(ctx.addChild).toHaveBeenCalled();
 

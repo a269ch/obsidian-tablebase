@@ -92,7 +92,7 @@ To view and edit an interactive database directly in **Live Preview** (Edit mode
 * **Properties Menu**: Click **Properties** to toggle visibility of any columns.
 
 ### 🧮 Summary Calculations
-* Hover over the footer row beneath the table and click a column to pick a summary:
+* Enable **Calculation row** for a table from its **Properties** menu, then hover over the footer row and click a column to pick a summary:
   * **Numbers**: `Sum`, `Average`, `Min`, `Max`, `Count`
   * **Tags & Text**: `Count all`, `Unique count`, `Empty`, `Not empty`
   * **Checkboxes**: `Checked count`, `Unchecked count`, `Percent completed`

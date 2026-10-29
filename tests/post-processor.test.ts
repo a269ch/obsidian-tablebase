@@ -64,7 +64,7 @@ function createProcessor(sectionInfo?: SectionSource): {
     new TableSyncService(new VaultService(app))
   );
 
-  const processor = new TablePostProcessor(controller, new TableViewRegistry());
+  const processor = new TablePostProcessor(controller, new TableViewRegistry(), settingsService);
 
   const ctx = {
     docId: "doc",
@@ -108,6 +108,18 @@ describe("TablePostProcessor date columns", () => {
     expect(addColTh).not.toBeNull();
     expect(addColTh?.querySelector(".ms-db-th-add-col-content")).not.toBeNull();
     expect(addColTh?.querySelector(".ms-db-th-add-col-icon svg")).not.toBeNull();
+  });
+
+  it("should skip standard Markdown tables when auto-conversion is disabled", async () => {
+    const { processor, ctx, settingsService } = createProcessor();
+    await settingsService.updateSettings({ autoConvertMarkdownTables: false });
+    const wrapper = buildRenderedTable(["Task"], [["Buy bread"]]);
+
+    processor.process(wrapper, ctx);
+
+    expect(wrapper.querySelector(".ms-notion-database-container")).toBeNull();
+    expect(wrapper.querySelector("table")).not.toBeNull();
+    expect(ctx.addChild).not.toHaveBeenCalled();
   });
 
   it("should register the view for lifecycle teardown", () => {
@@ -552,6 +564,19 @@ describe("TablePostProcessor source parsing", () => {
 
     const names = Array.from(wrapper.querySelectorAll(".ms-db-col-name")).map((el) => el.textContent);
     expect(names).toEqual(["Модуль", "Категория"]);
+  });
+
+  it("should bring inline code back in cells the renderer flattened", () => {
+    const text = ["| Where | What |", "| --- | --- |", "| Loose in `System/AI` | scripts |"].join("\n");
+
+    const { processor, ctx } = createProcessor({ text, lineStart: 0, lineEnd: 2 });
+    // Obsidian renders the code span as <code>; the cell's text loses the backticks.
+    const wrapper = buildRenderedTable(["Where", "What"], [["Loose in System/AI", "scripts"]]);
+
+    processor.process(wrapper, ctx);
+
+    const cell = wrapper.querySelector<HTMLElement>('.ms-db-td[data-col-index="0"]');
+    expect(cell?.querySelector(".ms-cell-code")?.textContent).toBe("System/AI");
   });
 
   it("should bring wikilinks back to life in cells the renderer flattened", () => {

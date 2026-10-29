@@ -166,6 +166,23 @@ export class TableMenus {
       this.setRowNumbersVisible(!isRowNumbersVisible);
     });
 
+    const showCalculationRow = this.ctx.filterState.showCalculationRow === true;
+    const calculationRowItem = menu.createDiv({
+      cls: `ms-menu-item ms-prop-toggle-item ${showCalculationRow ? "is-selected" : ""}`,
+    });
+    appendIcon(calculationRowItem.createSpan({ cls: "ms-prop-icon" }), ICON_TYPE_NUMBER);
+    calculationRowItem.createSpan({ text: "Calculation row" });
+    const calculationRowCheck = calculationRowItem.createSpan({ cls: "ms-prop-check" });
+    if (showCalculationRow) {
+      appendIcon(calculationRowCheck, ICON_CHECK);
+    }
+    calculationRowItem.addEventListener("click", () => {
+      this.closeActivePopover();
+      this.ctx.filterState.showCalculationRow = !showCalculationRow;
+      this.ctx.actions.onFilterChange(this.ctx.filterState);
+      this.ctx.render();
+    });
+
     menu.createDiv({ cls: "ms-menu-divider" });
     menu.createDiv({ cls: "ms-menu-section-title", text: "Visible Properties" });
 

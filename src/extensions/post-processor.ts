@@ -4,6 +4,7 @@ import { stripTypeAnnotation } from "../core/table-mutator";
 import { toPlainText } from "../utils/link-renderer";
 import { TableViewController } from "../services/table-view-controller";
 import { TableViewRegistry } from "../services/table-view-registry";
+import { SettingsService } from "../services/settings-service";
 import { MarkdownTableData, MarkdownTableRow } from "../types";
 import { isPrintMode } from "./print-mode";
 import { TableRenderChild } from "./table-render-child";
@@ -13,14 +14,20 @@ const SKIP_CONTAINER_CLASSES = ["ms-notion-database-container", "ms-kanban-conta
 export class TablePostProcessor {
   private viewController: TableViewController;
   private registry: TableViewRegistry;
+  private settingsService: SettingsService;
 
-  constructor(viewController: TableViewController, registry: TableViewRegistry) {
+  constructor(
+    viewController: TableViewController,
+    registry: TableViewRegistry,
+    settingsService: SettingsService
+  ) {
     this.viewController = viewController;
     this.registry = registry;
+    this.settingsService = settingsService;
   }
 
   public process(el: HTMLElement, ctx: MarkdownPostProcessorContext): void {
-    if (isPrintMode(el)) {
+    if (isPrintMode(el) || !this.settingsService.getSettings().autoConvertMarkdownTables) {
       return;
     }
 
@@ -144,7 +151,7 @@ export class TablePostProcessor {
     const source = this.findSourceTable(sectionInfo, headers, rows.length, tableIndex);
 
     const tableData: MarkdownTableData = {
-      id: `tbl_${ctx.sourcePath || "doc"}_${startLine}_${tableIndex}`,
+      id: `tbl_${ctx.sourcePath || "doc"}_${tableIndex}`,
       headers: this.reconcileHeaders(headers, source),
       alignments: source
         ? [...source.alignments]

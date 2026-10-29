@@ -607,12 +607,16 @@ input[type="text"].ms-filter-value-input:focus {
 }
 
 .ms-db-grid-table {
-  width: max-content;
-  min-width: 0;
+  width: 100%;
+  min-width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  table-layout: auto;
+  table-layout: fixed;
   margin: 0;
+}
+
+.ms-db-grid-table.is-resizing-columns {
+  transition: none;
 }
 
 .markdown-rendered .ms-notion-database-container table.ms-db-grid-table,
@@ -1201,10 +1205,20 @@ input[type="text"].ms-filter-value-input:focus {
   min-height: 20px;
   line-height: 1.4;
   word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .ms-cell-text-wrapper.is-number {
   font-variant-numeric: tabular-nums;
+}
+
+.ms-cell-code {
+  font-family: var(--font-monospace);
+  font-size: var(--code-size);
+  color: var(--code-normal);
+  background-color: var(--code-background);
+  border-radius: var(--code-radius, var(--radius-s));
+  padding: 0.1em 0.25em;
 }
 
 .ms-cell-link {
@@ -2602,5 +2616,4 @@ input[type="text"].ms-modal-name-input.is-invalid {
     display: none;
   }
 }
-
 

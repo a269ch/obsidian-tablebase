@@ -7,6 +7,7 @@ import {
   TableFilterState,
 } from "../types";
 import { parseCellTags } from "./tag-parser";
+import { stripCodeSpans } from "../utils/link-renderer";
 
 export function normalize(str: string): string {
   return (str || "").trim().toLowerCase();
@@ -29,6 +30,7 @@ export function evaluateRuleOnCell(
   operator: FilterOperator,
   filterValue: string | string[]
 ): boolean {
+  cellValue = stripCodeSpans(cellValue);
   const normCell = normalize(cellValue);
   const tags = columnType === "multi-select" ? parseCellTags(cellValue) : [];
   const tagNamesLower = tags.map((t) => normalize(t.name));

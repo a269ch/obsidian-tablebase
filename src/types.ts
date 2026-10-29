@@ -140,7 +140,11 @@ export interface TableFilterState {
   groupByColumnIndex?: number;
   stickyFirstColumn?: boolean;
   showRowNumbers?: boolean;
+  showCalculationRow?: boolean;
   scrollLeft?: number;
+  scrollTop?: number;
+  boardScrollLeft?: number;
+  boardScrollTops?: Record<string, number>;
   selection?: SerializedSelection;
 }
 
@@ -157,17 +161,20 @@ export type DateFormatOption =
 export interface PluginSettings {
   defaultTagFormat: TagFormat;
   dateFormat?: DateFormatOption;
+  autoConvertMarkdownTables: boolean;
   autoDetectMultiSelect: boolean;
   multiSelectColumnNames: string[];
   customTagColors: Record<string, TagColor>;
-  enableCalculations: boolean;
   stickyFirstColumn: boolean;
   showRowNumbers: boolean;
   showEmptyBoardProperties: boolean;
+  tableColumnWidths: Record<string, Record<string, number>>;
+  tableBoardGroupOrders: Record<string, Record<string, string[]>>;
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
   defaultTagFormat: "comma",
+  autoConvertMarkdownTables: true,
   autoDetectMultiSelect: true,
   multiSelectColumnNames: [
     "Tags",
@@ -180,10 +187,11 @@ export const DEFAULT_SETTINGS: PluginSettings = {
     "Keywords",
   ],
   customTagColors: {},
-  enableCalculations: true,
   stickyFirstColumn: true,
   showRowNumbers: false,
   showEmptyBoardProperties: false,
+  tableColumnWidths: {},
+  tableBoardGroupOrders: {},
 };
 
 export interface MarkdownTableRow {

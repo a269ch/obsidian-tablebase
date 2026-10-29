@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { App } from "obsidian";
 import { DEFAULT_SETTINGS, MarkdownTableData, TableColumn, TableFilterState } from "../src/types";
-import { KanbanView } from "../src/ui/kanban-view";
+import { getRowDropIndex, KanbanView } from "../src/ui/kanban-view";
 import { BoardViewActions } from "../src/ui/table/types";
 import { installObsidianDomHelpers } from "./helpers/obsidian-dom";
 
@@ -110,6 +110,78 @@ describe("KanbanView", () => {
     expect(titles).toContain("Write docs");
   });
 
+  it("should restore Board scroll positions from table state", async () => {
+    const filterState = {
+      ...defaultFilterState,
+      boardScrollLeft: 120,
+      boardScrollTops: { Todo: 45 },
+    };
+    const kanban = new KanbanView({
+      app: {} as App,
+      sourcePath: "notes/test.md",
+      tableData: sampleTableData,
+      columns: sampleColumns,
+      filterState,
+      settings: { ...DEFAULT_SETTINGS },
+      actions: createActions(),
+      onSwitchView: vi.fn(),
+    });
+
+    const board = kanban.getElement();
+    const boardWrapper = board.querySelector<HTMLElement>(".ms-kanban-board-wrapper");
+    const todoList = Array.from(
+      board.querySelectorAll<HTMLElement>(".ms-kanban-cards-list")
+    ).find((list) => list.parentElement?.dataset.groupName === "Todo");
+
+    await Promise.resolve();
+    expect(boardWrapper?.scrollLeft).toBe(120);
+    expect(todoList?.scrollTop).toBe(45);
+  });
+
+  it("should keep select groups in property order and retain empty groups", () => {
+    const columns = sampleColumns.map((column) =>
+      column.name === "Status"
+        ? {
+            ...column,
+            uniqueTags: [
+              { id: "done", name: "Done", color: "green" as const },
+              { id: "todo", name: "Todo", color: "blue" as const },
+              { id: "blocked", name: "Blocked", color: "red" as const },
+            ],
+          }
+        : column
+    );
+    const tableData = {
+      ...sampleTableData,
+      rows: sampleTableData.rows.map((row) => ({ ...row, cells: [...row.cells] })),
+    };
+    tableData.rows[0].cells[1] = "Done";
+    tableData.rows[1].cells[1] = "Done";
+    tableData.rows[2].cells[1] = "";
+
+    const kanban = new KanbanView({
+      app: {} as App,
+      sourcePath: "notes/test.md",
+      tableData,
+      columns,
+      filterState: { ...defaultFilterState },
+      settings: { ...DEFAULT_SETTINGS },
+      actions: createActions(),
+      onSwitchView: vi.fn(),
+    });
+
+    const board = kanban.getElement();
+    const headers = Array.from(board.querySelectorAll<HTMLElement>(".ms-kanban-column-title"))
+      .map((header) => header.textContent?.replace(/\d+$/, "").trim());
+
+    expect(headers).toEqual(["Done", "Todo", "Blocked", "No Status"]);
+  });
+
+  it("should adjust the target index when moving a card across the target", () => {
+    expect(getRowDropIndex(0, 1)).toBe(0);
+    expect(getRowDropIndex(3, 1)).toBe(1);
+  });
+
   it("should handle switching view back to table", () => {
     const actions = createActions();
     const onSwitchView = vi.fn();
@@ -214,7 +286,7 @@ describe("KanbanView", () => {
       input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     }
 
-    expect(actions.onCellUpdate).toHaveBeenCalledWith(2, 0, "Redesign UI completely");
+    expect(actions.onCellUpdate).toHaveBeenCalledWith(0, 0, "Redesign UI completely");
   });
 
   it("should toggle checkbox property on click", async () => {
@@ -239,7 +311,7 @@ describe("KanbanView", () => {
     expect(checkboxBadges.length).toBeGreaterThan(0);
 
     checkboxBadges[0].click();
-    expect(actions.onCellUpdate).toHaveBeenCalledWith(2, 4, "[x]");
+    expect(actions.onCellUpdate).toHaveBeenCalledWith(0, 4, "[x]");
   });
 
   it("should render clickable links in kanban card titles and handle click events", () => {

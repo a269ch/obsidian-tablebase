@@ -11,6 +11,7 @@ import {
   TableColumn,
   TableFilterState,
 } from "../types";
+import { stripCodeSpans } from "../utils/link-renderer";
 import { isCalculationType } from "./calculation-engine";
 import { parseColumnAlignment } from "./markdown-parser";
 import { isCellChecked, parseCellNumber } from "./sort-engine";
@@ -42,7 +43,8 @@ export class TableStateManager {
 
     for (let c = 0; c < table.headers.length; c++) {
       const rawHeader = table.headers[c] || "";
-      const columnCells = table.rows.map((r) => r.cells[c] || "");
+      // Types are read from the text a cell shows, so "`42`" is a number.
+      const columnCells = table.rows.map((r) => stripCodeSpans(r.cells[c] || ""));
 
       let inferredType: ColumnType = "text";
       let cleanHeaderName = stripTypeAnnotation(rawHeader);
@@ -120,11 +122,15 @@ export class TableStateManager {
         ? parseColumnAlignment(rawAlign)
         : (inferredType === "number" ? "right" : inferredType === "checkbox" ? "center" : "left");
 
+      const savedWidth = settings.tableColumnWidths?.[table.id]?.[String(c)];
       columns.push({
         name: cleanHeaderName,
         index: c,
         type: inferredType,
         align,
+        ...(typeof savedWidth === "number" && Number.isFinite(savedWidth)
+          ? { width: savedWidth }
+          : {}),
         dateFormat: columnDateFormat,
         ...(columnCalculation && columnCalculation !== "none"
           ? { calculation: columnCalculation }
@@ -193,6 +199,7 @@ export class TableStateManager {
         searchQuery: "",
         isFilterOpen: false,
         isSortOpen: false,
+        showCalculationRow: false,
       };
       this.filterStates.set(tableId, state);
     }
@@ -216,6 +223,7 @@ export class TableStateManager {
       conjunction: state.conjunction,
       rules: state.rules,
       sortRules: state.sortRules,
+      showCalculationRow: state.showCalculationRow === true,
     };
     return `<!-- ms-filter: ${JSON.stringify(payload)} -->`;
   }
@@ -232,6 +240,7 @@ export class TableStateManager {
         conjunction?: "AND" | "OR";
         rules?: FilterRule[];
         sortRules?: SortRule[];
+        showCalculationRow?: boolean;
       };
       const rules = Array.isArray(parsed?.rules) ? parsed.rules : [];
       const sortRules = Array.isArray(parsed?.sortRules) ? parsed.sortRules : [];
@@ -243,6 +252,7 @@ export class TableStateManager {
         searchQuery: "",
         isFilterOpen: rules.length > 0,
         isSortOpen: sortRules.length > 0,
+        showCalculationRow: parsed?.showCalculationRow === true,
       };
     } catch {
       return null;

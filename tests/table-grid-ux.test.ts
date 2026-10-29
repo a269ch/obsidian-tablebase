@@ -73,10 +73,6 @@ function buildGrid(raw: string, columns: TableColumn[]) {
   return { ctx, actions, containerEl, grid };
 }
 
-function nextFrame(): Promise<void> {
-  return new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
-}
-
 function dragEvent(type: string): Event {
   const event = new Event(type, { bubbles: true, cancelable: true });
   Object.defineProperty(event, "dataTransfer", {
@@ -87,7 +83,7 @@ function dragEvent(type: string): Event {
 
 /** jsdom has no layout, so scrollLeft has to be made observable by hand. */
 function trackScrollLeft(el: HTMLElement): { get value(): number; set value(next: number) } {
-  let current = 0;
+  let current = el.scrollLeft;
   Object.defineProperty(el, "scrollLeft", {
     configurable: true,
     get: () => current,
@@ -131,7 +127,7 @@ describe("Table grid UX", () => {
     expect(inner?.querySelector("button.ms-db-add-row-btn")).not.toBeNull();
   });
 
-  it("should remember the horizontal scroll offset and restore it on the next render", async () => {
+  it("should restore the horizontal scroll offset synchronously on the next render", () => {
     const { ctx, grid } = buildGrid(SAMPLE, SAMPLE_COLUMNS);
     grid.render(ctx.containerEl);
 
@@ -153,7 +149,6 @@ describe("Table grid UX", () => {
     if (!rebuilt) return;
 
     const restored = trackScrollLeft(rebuilt);
-    await nextFrame();
     expect(restored.value).toBe(240);
   });
 
@@ -169,11 +164,11 @@ describe("Table grid UX", () => {
     sourceTh?.dispatchEvent(dragEvent("dragstart"));
 
     const draggedCells = ctx.containerEl.querySelectorAll('[data-col-index="0"].is-dragging-col');
-    expect(draggedCells.length).toBe(4); // header + two body cells + calculation cell
+    expect(draggedCells.length).toBe(3); // header + two body cells
 
     targetTh?.dispatchEvent(dragEvent("dragover"));
     const afterMarked = ctx.containerEl.querySelectorAll('[data-col-index="2"].is-col-drop-after');
-    expect(afterMarked.length).toBe(4);
+    expect(afterMarked.length).toBe(3);
     expect(ctx.containerEl.querySelectorAll(".is-col-drop-before").length).toBe(0);
 
     targetTh?.dispatchEvent(dragEvent("drop"));
@@ -192,7 +187,7 @@ describe("Table grid UX", () => {
       .querySelector<HTMLElement>('th.ms-db-th[data-col-index="0"]')
       ?.dispatchEvent(dragEvent("dragover"));
 
-    expect(ctx.containerEl.querySelectorAll('[data-col-index="0"].is-col-drop-before').length).toBe(4);
+    expect(ctx.containerEl.querySelectorAll('[data-col-index="0"].is-col-drop-before').length).toBe(3);
     expect(ctx.containerEl.querySelectorAll(".is-col-drop-after").length).toBe(0);
   });
 
@@ -233,18 +228,53 @@ describe("Table grid UX", () => {
     expect(actions.onAddRow).toHaveBeenCalledTimes(2);
   });
 
-  it("should always offer the calculation bar and show the result once chosen", () => {
+  it("should resize only the selected column from the pointer delta", () => {
+    const { ctx, grid } = buildGrid(SAMPLE, SAMPLE_COLUMNS);
+    const onColumnResize = vi.fn(async () => undefined);
+    ctx.actions.onColumnResize = onColumnResize;
+    grid.render(ctx.containerEl);
+
+    const headers = Array.from(
+      ctx.containerEl.querySelectorAll<HTMLElement>("th.ms-db-th")
+    );
+    const widths = [120, 180, 90];
+    headers.forEach((header, index) => {
+      vi.spyOn(header, "getBoundingClientRect").mockReturnValue({
+        width: widths[index],
+        left: widths.slice(0, index).reduce((sum, width) => sum + width, 0),
+        right: widths.slice(0, index + 1).reduce((sum, width) => sum + width, 0),
+        top: 0,
+        bottom: 30,
+        height: 30,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      });
+    });
+
+    const resizer = headers[1].querySelector<HTMLElement>(".ms-col-resizer");
+    expect(resizer).not.toBeNull();
+    resizer?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, clientX: 200 }));
+    document.dispatchEvent(new MouseEvent("mousemove", { clientX: 250 }));
+    expect(headers[1].style.width).toBe("230px");
+    expect(headers[0].style.width).toBe("120px");
+    expect(headers[2].style.width).toBe("90px");
+
+    document.dispatchEvent(new MouseEvent("mouseup"));
+    expect(onColumnResize).toHaveBeenCalledWith({ "0": 120, "1": 230, "2": 90 });
+  });
+
+  it("should show the calculation bar only when enabled for the table", () => {
     const plain = buildGrid(SAMPLE, SAMPLE_COLUMNS);
     plain.grid.render(plain.ctx.containerEl);
 
-    const placeholders = plain.ctx.containerEl.querySelectorAll(".ms-calc-placeholder");
-    expect(placeholders.length).toBe(SAMPLE_COLUMNS.length);
-    expect(plain.ctx.containerEl.querySelector(".ms-db-tfoot.is-active")).toBeNull();
+    expect(plain.ctx.containerEl.querySelector(".ms-db-tfoot")).toBeNull();
 
     const withSum: TableColumn[] = SAMPLE_COLUMNS.map((col) =>
       col.name === "Amount" ? { ...col, calculation: "sum" as const } : col
     );
     const summed = buildGrid(SAMPLE, withSum);
+    summed.ctx.filterState.showCalculationRow = true;
     summed.grid.render(summed.ctx.containerEl);
 
     const calcCell = summed.ctx.containerEl.querySelector<HTMLElement>(

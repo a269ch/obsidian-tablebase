@@ -41,6 +41,7 @@ export interface TableViewActions {
   onFilterChange(state: TableFilterState): void;
   onSortChange(sortRules: SortRule[]): void;
   onTagColorChange(tagName: string, color: TagColor): Promise<void>;
+  onColumnResize?(this: void, widths: Record<string, number>): Promise<void>;
 }
 
 export type BoardViewActions = Pick<
