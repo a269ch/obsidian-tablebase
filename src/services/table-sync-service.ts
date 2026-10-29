@@ -92,8 +92,14 @@ export class TableSyncService {
       );
       if (!block) return content;
 
-      const lineEnding = lines[block.openLine].endsWith("\r") ? "\r" : "";
-      const bodyLines = newBody.map((line) => `${block.prefix}${line}${lineEnding}`);
+      const defaultLineEnding = lines[block.openLine].endsWith("\r") ? "\r" : "";
+      const originalBodyLineEndings = lines
+        .slice(block.openLine + 1, block.closeLine)
+        .map((line) => (line.endsWith("\r") ? "\r" : ""));
+      const bodyLines = newBody.map((line, index) => {
+        const lineEnding = originalBodyLineEndings[index] ?? defaultLineEnding;
+        return `${block.prefix}${line}${lineEnding}`;
+      });
       lines.splice(block.openLine + 1, block.closeLine - block.openLine - 1, ...bodyLines);
       replaced = true;
       return lines.join("\n");

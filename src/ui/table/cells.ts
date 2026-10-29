@@ -46,19 +46,20 @@ export class CellRenderer {
     colIndex: number
   ): void {
     const rawValue = row.cells[colIndex] || "";
+    const displayValue = stripCodeSpans(rawValue);
 
     switch (col.type) {
       case "checkbox":
-        this.renderCheckbox(td, row, colIndex, rawValue);
+        this.renderCheckbox(td, row, colIndex, displayValue);
         break;
       case "date":
-        this.renderDate(td, row, col, colIndex, rawValue);
+        this.renderDate(td, row, col, colIndex, displayValue, rawValue);
         break;
       case "select":
-        this.renderSingleSelect(td, row, col, colIndex, rawValue);
+        this.renderSingleSelect(td, row, col, colIndex, displayValue, rawValue);
         break;
       case "multi-select":
-        this.renderMultiSelect(td, row, col, colIndex, rawValue);
+        this.renderMultiSelect(td, row, col, colIndex, displayValue, rawValue);
         break;
       default:
         this.renderText(td, row, col, colIndex, rawValue);
@@ -99,18 +100,19 @@ export class CellRenderer {
     row: MarkdownTableRow,
     col: TableColumn,
     colIndex: number,
+    displayValue: string,
     rawValue: string
   ): void {
     const wrapper = td.createDiv({ cls: "ms-cell-date-wrapper" });
 
-    if (rawValue.trim()) {
+    if (displayValue.trim()) {
       appendIcon(wrapper.createSpan({ cls: "ms-date-icon" }), ICON_TYPE_DATE);
       const targetFormat =
         col.dateFormat ?? this.ctx.settings.dateFormat ?? "YYYY-MM-DD";
-      const parsedDate = parseAnyDate(rawValue, targetFormat);
+      const parsedDate = parseAnyDate(displayValue, targetFormat);
       const displayText = parsedDate
         ? formatDateByOption(parsedDate, targetFormat)
-        : rawValue;
+        : displayValue;
       wrapper.createSpan({ cls: "ms-date-text", text: displayText });
     } else {
       wrapper.createSpan({ cls: "ms-cell-empty-placeholder", text: "Empty" });
@@ -127,9 +129,10 @@ export class CellRenderer {
     row: MarkdownTableRow,
     col: TableColumn,
     colIndex: number,
+    displayValue: string,
     rawValue: string
   ): void {
-    const tags = parseCellTags(rawValue, this.ctx.settings.customTagColors);
+    const tags = parseCellTags(displayValue, this.ctx.settings.customTagColors);
     const container = td.createDiv({ cls: "ms-cell-badges-container is-single-select" });
 
     if (tags.length === 0) {
@@ -158,9 +161,10 @@ export class CellRenderer {
     row: MarkdownTableRow,
     col: TableColumn,
     colIndex: number,
+    displayValue: string,
     rawValue: string
   ): void {
-    const tags = parseCellTags(rawValue, this.ctx.settings.customTagColors);
+    const tags = parseCellTags(displayValue, this.ctx.settings.customTagColors);
     const container = td.createDiv({ cls: "ms-cell-badges-container" });
 
     if (tags.length === 0) {

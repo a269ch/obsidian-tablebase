@@ -167,6 +167,31 @@ describe("TableSyncService", () => {
     expect(content).toBe(`# Note\n\n${crlf(`\`\`\`table\n${newBody}\n\`\`\`\n`)}End`);
   });
 
+  it("should preserve mixed line endings in the replaced table body", async () => {
+    const doc = [
+      "```table\r",
+      "| Task | Status |\r",
+      "| --- | --- |",
+      "| Old | Todo |\r",
+      "```",
+      "",
+    ].join("\n");
+
+    const { content } = await sync(doc, oldSource);
+
+    const newLines = newBody.split("\n");
+    expect(content).toBe(
+      [
+        "```table\r",
+        `${newLines[0]}\r`,
+        newLines[1],
+        `${newLines[2]}\r`,
+        "```",
+        "",
+      ].join("\n")
+    );
+  });
+
   it("should sync inline table by executing document mutation transform", async () => {
     const originalDoc = `# My Note\n\n| Col1 | Col2 |\n| --- | --- |\n| A | B |\n`;
     const { vaultService, getContent } = createMockVaultService(originalDoc);
