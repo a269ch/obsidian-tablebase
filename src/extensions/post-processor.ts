@@ -151,7 +151,7 @@ export class TablePostProcessor {
     const source = this.findSourceTable(sectionInfo, headers, rows.length, tableIndex);
 
     const tableData: MarkdownTableData = {
-      id: `tbl_${ctx.sourcePath || "doc"}_${startLine}_${tableIndex}`,
+      id: `tbl_${ctx.sourcePath || "doc"}_${tableIndex}`,
       headers: this.reconcileHeaders(headers, source),
       alignments: source
         ? [...source.alignments]

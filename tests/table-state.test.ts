@@ -69,6 +69,22 @@ describe("Table State Manager", () => {
     expect(columns[4].dateFormat).toBe("DD.MM.YYYY");
   });
 
+  it("should restore saved column widths for the matching table only", () => {
+    const manager = new TableStateManager();
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      tableColumnWidths: {
+        [tableData.id]: { "1": 234 },
+        other_table: { "1": 999 },
+      },
+    };
+
+    const columns = manager.analyzeColumns(tableData, settings);
+
+    expect(columns[1].width).toBe(234);
+    expect(columns[0].width).toBeUndefined();
+  });
+
   it("should manage filter state per tableId", () => {
     const manager = new TableStateManager();
     const state = manager.getOrCreateFilterState("tbl_123");
@@ -91,6 +107,19 @@ describe("Table State Manager", () => {
 
     manager.clearFilterState("tbl_123");
     expect(manager.getOrCreateFilterState("tbl_123").rules.length).toBe(0);
+  });
+
+  it("should persist the calculation row property in the table state comment", () => {
+    const manager = new TableStateManager();
+    const state = manager.getOrCreateFilterState("tbl_123");
+    state.showCalculationRow = true;
+
+    const restored = manager.deserializeFromComment(
+      manager.serializeToComment(state),
+      "tbl_123"
+    );
+
+    expect(restored?.showCalculationRow).toBe(true);
   });
 
   it("should serialize and deserialize filter comment", () => {

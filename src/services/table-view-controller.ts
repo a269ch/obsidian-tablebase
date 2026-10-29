@@ -82,6 +82,8 @@ export class TableViewController {
   private settingsService: SettingsService;
   private stateManager: TableStateManager;
   private syncService: TableSyncService;
+  private editorScroll: Map<string, { top: number; left: number }> = new Map();
+  private editorScrollObservers: Map<string, MutationObserver> = new Map();
 
   constructor(
     app: App,
@@ -147,6 +149,39 @@ export class TableViewController {
   ): NotionTableView {
     const settings = this.settingsService.getSettings();
     const columns = this.stateManager.analyzeColumns(tableData, settings);
+    const savedGroupOrders = settings.tableBoardGroupOrders?.[tableData.id] ?? {};
+    const tableGroupOrders: Record<string, string[]> = { ...savedGroupOrders };
+
+    for (const column of columns) {
+      if (column.type !== "select" && column.type !== "multi-select") continue;
+
+      const currentNames = (column.uniqueTags ?? []).map((tag) => tag.name);
+      const savedNames = tableGroupOrders[String(column.index)] ?? [];
+      const orderedNames = [
+        ...savedNames,
+        ...currentNames.filter((name) => !savedNames.includes(name)),
+      ];
+      tableGroupOrders[String(column.index)] = orderedNames;
+      const tagsByName = new Map((column.uniqueTags ?? []).map((tag) => [tag.name, tag]));
+      column.uniqueTags = orderedNames.flatMap((name) => {
+        return [
+          tagsByName.get(name) ?? {
+            id: name.toLowerCase(),
+            name,
+            color: "gray" as const,
+          },
+        ];
+      });
+    }
+
+    if (JSON.stringify(savedGroupOrders) !== JSON.stringify(tableGroupOrders)) {
+      void this.settingsService.updateSettings({
+        tableBoardGroupOrders: {
+          ...(settings.tableBoardGroupOrders ?? {}),
+          [tableData.id]: tableGroupOrders,
+        },
+      });
+    }
     const filterState = this.stateManager.getOrCreateFilterState(tableData.id);
     filterState.sortRules ??= [];
 
@@ -156,11 +191,26 @@ export class TableViewController {
       mutate: () => TableOperation | null,
       options: { refresh?: boolean } = {}
     ): Promise<void> => {
+      this.captureEditorScroll(sourcePath);
+      this.watchEditorScroll(sourcePath);
       const previousHeaders = [...tableData.headers];
       const operation = mutate();
       if (!operation) return;
 
       await persist(operation, previousHeaders);
+      this.restoreEditorScroll(sourcePath);
+      if (typeof window !== "undefined") {
+        let frames = 0;
+        const restoreForSeveralFrames = (): void => {
+          this.restoreEditorScroll(sourcePath);
+          if (++frames < 12) {
+            window.requestAnimationFrame(restoreForSeveralFrames);
+          } else {
+            this.stopWatchingEditorScroll(sourcePath);
+          }
+        };
+        window.requestAnimationFrame(restoreForSeveralFrames);
+      }
 
       if (options.refresh !== false) {
         view?.updateData(tableData, columns);
@@ -283,6 +333,18 @@ export class TableViewController {
       onTagColorChange: async (tagName, color) => {
         await this.settingsService.setTagColor(tagName, color);
       },
+
+      onColumnResize: async (widths) => {
+        const settings = this.settingsService.getSettings();
+        const tableColumnWidths = {
+          ...settings.tableColumnWidths,
+          [tableData.id]: {
+            ...(settings.tableColumnWidths?.[tableData.id] ?? {}),
+            ...widths,
+          },
+        };
+        await this.settingsService.updateSettings({ tableColumnWidths });
+      },
     };
 
     view = new NotionTableView({
@@ -301,6 +363,44 @@ export class TableViewController {
     view.registry.addFn(unsubscribe);
 
     return view;
+  }
+
+  private captureEditorScroll(sourcePath: string): void {
+    if (typeof document === "undefined") return;
+    const scroller = document.querySelector<HTMLElement>(
+      ".workspace-leaf.mod-active .cm-scroller"
+    );
+    if (scroller) {
+      this.editorScroll.set(sourcePath, {
+        top: scroller.scrollTop,
+        left: scroller.scrollLeft,
+      });
+    }
+  }
+
+  private watchEditorScroll(sourcePath: string): void {
+    if (typeof document === "undefined" || typeof MutationObserver === "undefined") return;
+    this.stopWatchingEditorScroll(sourcePath);
+    const observer = new MutationObserver(() => this.restoreEditorScroll(sourcePath));
+    observer.observe(document.body, { childList: true, subtree: true });
+    this.editorScrollObservers.set(sourcePath, observer);
+  }
+
+  private stopWatchingEditorScroll(sourcePath: string): void {
+    const observer = this.editorScrollObservers.get(sourcePath);
+    observer?.disconnect();
+    this.editorScrollObservers.delete(sourcePath);
+  }
+
+  private restoreEditorScroll(sourcePath: string): void {
+    const position = this.editorScroll.get(sourcePath);
+    if (!position || typeof document === "undefined") return;
+    const scroller = document.querySelector<HTMLElement>(
+      ".workspace-leaf.mod-active .cm-scroller"
+    );
+    if (!scroller) return;
+    scroller.scrollTop = position.top;
+    scroller.scrollLeft = position.left;
   }
 }
 

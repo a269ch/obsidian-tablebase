@@ -49,6 +49,10 @@ const NO_STATUS_KEY = "__NO_STATUS__";
 const CHECKED_GROUP = "[x]";
 const UNCHECKED_GROUP = "[ ]";
 
+export function getRowDropIndex(fromIndex: number, targetIndex: number): number {
+  return fromIndex < targetIndex ? targetIndex - 1 : targetIndex;
+}
+
 export class KanbanView {
   private options: KanbanViewOptions;
   private containerEl: HTMLElement;
@@ -78,6 +82,13 @@ export class KanbanView {
 
   public getElement(): HTMLElement {
     this.render();
+    const boardWrapper = this.containerEl.querySelector<HTMLElement>(".ms-kanban-board-wrapper");
+    const scrollLeft = this.options.filterState.boardScrollLeft ?? 0;
+    if (boardWrapper && typeof queueMicrotask === "function") {
+      queueMicrotask(() => {
+        boardWrapper.scrollLeft = scrollLeft;
+      });
+    }
     return this.containerEl;
   }
 
@@ -89,6 +100,10 @@ export class KanbanView {
     const isCheckboxGroup = groupByCol?.type === "checkbox";
     const groups = this.groupRows(groupByCol);
     const boardWrapper = this.containerEl.createDiv({ cls: "ms-kanban-board-wrapper" });
+    boardWrapper.scrollLeft = this.options.filterState.boardScrollLeft ?? 0;
+    boardWrapper.addEventListener("scroll", () => {
+      this.options.filterState.boardScrollLeft = boardWrapper.scrollLeft;
+    });
 
     groups.forEach((rows, groupName) => {
       this.renderColumn(boardWrapper, groupName, rows, groupByCol, isCheckboxGroup);
@@ -159,6 +174,7 @@ export class KanbanView {
 
     const noStatusRows: MarkdownTableRow[] = [];
     const tagGroups = new Map<string, MarkdownTableRow[]>();
+    const unknownGroups = new Map<string, MarkdownTableRow[]>();
 
     for (const tag of groupByCol?.uniqueTags ?? []) {
       tagGroups.set(tag.name, []);
@@ -176,15 +192,19 @@ export class KanbanView {
         tags.length > 0 ? tags[0].name : cellValue.replace(/^\[\[|\]\]$/g, "").trim();
 
       if (!tagGroups.has(key)) {
-        tagGroups.set(key, []);
+        if (!unknownGroups.has(key)) {
+          unknownGroups.set(key, []);
+        }
       }
-      tagGroups.get(key)?.push(row);
+      (tagGroups.get(key) ?? unknownGroups.get(key))?.push(row);
     }
 
-    if (noStatusRows.length > 0 || tagGroups.size === 0) {
-      groups.set(NO_STATUS_KEY, noStatusRows);
-    }
+    Array.from(unknownGroups.keys())
+      .sort((left, right) => left.localeCompare(right))
+      .forEach((name) => tagGroups.set(name, unknownGroups.get(name) ?? []));
+
     tagGroups.forEach((rows, name) => groups.set(name, rows));
+    groups.set(NO_STATUS_KEY, noStatusRows);
 
     return groups;
   }
@@ -232,6 +252,13 @@ export class KanbanView {
 
     const targetValue = isCheckboxGroup ? groupName : isNoStatus ? "" : groupName;
     const cardsList = colEl.createDiv({ cls: "ms-kanban-cards-list" });
+    cardsList.scrollTop = this.options.filterState.boardScrollTops?.[groupName] ?? 0;
+    cardsList.addEventListener("scroll", () => {
+      this.options.filterState.boardScrollTops = {
+        ...(this.options.filterState.boardScrollTops ?? {}),
+        [groupName]: cardsList.scrollTop,
+      };
+    });
 
     cardsList.addEventListener("dragover", (e) => {
       e.preventDefault();
@@ -311,9 +338,9 @@ export class KanbanView {
       void (async () => {
         await this.options.actions.onCellUpdate(fromIndex, this.groupByColIndex, targetValue);
         if (fromIndex !== row.rowIndex) {
-          await this.options.actions.onReorderRows(fromIndex, row.rowIndex);
+          const targetIndex = getRowDropIndex(fromIndex, row.rowIndex);
+          await this.options.actions.onReorderRows(fromIndex, targetIndex);
         }
-        this.render();
       })();
     });
 

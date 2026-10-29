@@ -122,11 +122,15 @@ export class TableStateManager {
         ? parseColumnAlignment(rawAlign)
         : (inferredType === "number" ? "right" : inferredType === "checkbox" ? "center" : "left");
 
+      const savedWidth = settings.tableColumnWidths?.[table.id]?.[String(c)];
       columns.push({
         name: cleanHeaderName,
         index: c,
         type: inferredType,
         align,
+        ...(typeof savedWidth === "number" && Number.isFinite(savedWidth)
+          ? { width: savedWidth }
+          : {}),
         dateFormat: columnDateFormat,
         ...(columnCalculation && columnCalculation !== "none"
           ? { calculation: columnCalculation }
@@ -195,6 +199,7 @@ export class TableStateManager {
         searchQuery: "",
         isFilterOpen: false,
         isSortOpen: false,
+        showCalculationRow: false,
       };
       this.filterStates.set(tableId, state);
     }
@@ -218,6 +223,7 @@ export class TableStateManager {
       conjunction: state.conjunction,
       rules: state.rules,
       sortRules: state.sortRules,
+      showCalculationRow: state.showCalculationRow === true,
     };
     return `<!-- ms-filter: ${JSON.stringify(payload)} -->`;
   }
@@ -234,6 +240,7 @@ export class TableStateManager {
         conjunction?: "AND" | "OR";
         rules?: FilterRule[];
         sortRules?: SortRule[];
+        showCalculationRow?: boolean;
       };
       const rules = Array.isArray(parsed?.rules) ? parsed.rules : [];
       const sortRules = Array.isArray(parsed?.sortRules) ? parsed.sortRules : [];
@@ -245,6 +252,7 @@ export class TableStateManager {
         searchQuery: "",
         isFilterOpen: rules.length > 0,
         isSortOpen: sortRules.length > 0,
+        showCalculationRow: parsed?.showCalculationRow === true,
       };
     } catch {
       return null;

@@ -237,6 +237,31 @@ describe("CellRenderer date cells", () => {
     expect(multiTd.textContent).toContain("Two");
   });
 
+  it("should capture table scroll before updating a checkbox", () => {
+    const checkboxCol: TableColumn = { name: "Approved", index: 0, type: "checkbox" };
+    const checkboxRow: MarkdownTableRow = { rowIndex: 0, rawLine: "", cells: ["[ ]"] };
+    const { ctx, containerEl, actions } = createContext([checkboxCol], [checkboxRow]);
+    const scrollWrapper = containerEl.createDiv({ cls: "ms-db-table-scroll-wrapper" });
+    let scrollLeft = 240;
+    let scrollTop = 18;
+    Object.defineProperties(scrollWrapper, {
+      scrollLeft: { configurable: true, get: () => scrollLeft, set: (value) => (scrollLeft = value) },
+      scrollTop: { configurable: true, get: () => scrollTop, set: (value) => (scrollTop = value) },
+    });
+    const td = scrollWrapper.createEl("td");
+    new CellRenderer(ctx).render(td, checkboxRow, checkboxCol, 0);
+
+    const checkbox = td.querySelector<HTMLInputElement>("input");
+    if (checkbox) {
+      checkbox.checked = true;
+      checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    expect(ctx.filterState.scrollLeft).toBe(240);
+    expect(ctx.filterState.scrollTop).toBe(18);
+    expect(actions.onCellUpdate).toHaveBeenCalledWith(0, 0, "[x]");
+  });
+
   it("should render links in text cells and open them on click", () => {
     const textCol: TableColumn = { name: "Resource", index: 0, type: "text" };
     const row: MarkdownTableRow = {
