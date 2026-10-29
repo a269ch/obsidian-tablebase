@@ -199,6 +199,44 @@ describe("CellRenderer date cells", () => {
     expect(td.querySelector(".ms-date-text")?.textContent).toBe("15.09.2026");
   });
 
+  it("should parse inline code values in typed cells while preserving raw values for editing", () => {
+    const checkboxCol: TableColumn = { name: "Done", index: 0, type: "checkbox" };
+    const checkboxRow: MarkdownTableRow = { rowIndex: 0, rawLine: "", cells: ["`[x]`"] };
+    const checkboxContext = createContext([checkboxCol], [checkboxRow]);
+    const checkboxRenderer = new CellRenderer(checkboxContext.ctx);
+    const checkboxTd = checkboxContext.containerEl.createEl("td");
+    checkboxRenderer.render(checkboxTd, checkboxRow, checkboxCol, 0);
+
+    expect(checkboxTd.querySelector<HTMLInputElement>("input")?.checked).toBe(true);
+
+    const dateRow: MarkdownTableRow = { rowIndex: 1, rawLine: "", cells: ["`2026-09-15`"] };
+    const dateContext = createContext([DATE_COLUMN], [dateRow]);
+    const dateRenderer = new CellRenderer(dateContext.ctx);
+    const dateTd = dateContext.containerEl.createEl("td");
+    dateRenderer.render(dateTd, dateRow, dateContext.ctx.columns[0], 0);
+
+    expect(dateTd.querySelector(".ms-date-text")?.textContent).toBe("15.09.2026");
+
+    const selectCol: TableColumn = { name: "Status", index: 0, type: "select" };
+    const selectRow: MarkdownTableRow = { rowIndex: 2, rawLine: "", cells: ["`Done`"] };
+    const selectContext = createContext([selectCol], [selectRow]);
+    const selectRenderer = new CellRenderer(selectContext.ctx);
+    const selectTd = selectContext.containerEl.createEl("td");
+    selectRenderer.render(selectTd, selectRow, selectCol, 0);
+
+    expect(selectTd.textContent).toContain("Done");
+
+    const multiCol: TableColumn = { name: "Tags", index: 0, type: "multi-select" };
+    const multiRow: MarkdownTableRow = { rowIndex: 3, rawLine: "", cells: ["`One, Two`"] };
+    const multiContext = createContext([multiCol], [multiRow]);
+    const multiRenderer = new CellRenderer(multiContext.ctx);
+    const multiTd = multiContext.containerEl.createEl("td");
+    multiRenderer.render(multiTd, multiRow, multiCol, 0);
+
+    expect(multiTd.textContent).toContain("One");
+    expect(multiTd.textContent).toContain("Two");
+  });
+
   it("should render links in text cells and open them on click", () => {
     const textCol: TableColumn = { name: "Resource", index: 0, type: "text" };
     const row: MarkdownTableRow = {

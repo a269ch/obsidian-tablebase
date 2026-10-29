@@ -11,6 +11,7 @@ import {
   TableColumn,
   TableFilterState,
 } from "../types";
+import { stripCodeSpans } from "../utils/link-renderer";
 import { isCalculationType } from "./calculation-engine";
 import { parseColumnAlignment } from "./markdown-parser";
 import { isCellChecked, parseCellNumber } from "./sort-engine";
@@ -42,7 +43,8 @@ export class TableStateManager {
 
     for (let c = 0; c < table.headers.length; c++) {
       const rawHeader = table.headers[c] || "";
-      const columnCells = table.rows.map((r) => r.cells[c] || "");
+      // Types are read from the text a cell shows, so "`42`" is a number.
+      const columnCells = table.rows.map((r) => stripCodeSpans(r.cells[c] || ""));
 
       let inferredType: ColumnType = "text";
       let cleanHeaderName = stripTypeAnnotation(rawHeader);

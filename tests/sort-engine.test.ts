@@ -44,6 +44,17 @@ describe("Sort Engine", () => {
     expect(desc.map((r) => r.cells[0])).toEqual(["Cherry", "Banana", "Apple"]);
   });
 
+  it("should sort code cells by the text they show", () => {
+    const rows: MarkdownTableRow[] = [
+      { rowIndex: 0, rawLine: "", cells: ["banana"] },
+      { rowIndex: 1, rawLine: "", cells: ["`cherry`"] },
+      { rowIndex: 2, rawLine: "", cells: ["apple"] },
+    ];
+
+    const asc = sortRows(rows, 0, "asc", "text");
+    expect(asc.map((r) => r.cells[0])).toEqual(["apple", "banana", "`cherry`"]);
+  });
+
   it("should sort number rows numerically", () => {
     const rows: MarkdownTableRow[] = [
       { rowIndex: 0, rawLine: "", cells: ["$100"] },
