@@ -69,6 +69,13 @@ export class CellRenderer {
 
   private focusCell(row: number, col: number): void {
     closeAllFloatingPopovers();
+    const scrollWrapper = this.ctx.containerEl.querySelector<HTMLElement>(
+      ".ms-db-table-scroll-wrapper"
+    );
+    if (scrollWrapper) {
+      this.ctx.filterState.scrollLeft = scrollWrapper.scrollLeft;
+      this.ctx.filterState.scrollTop = scrollWrapper.scrollTop;
+    }
     this.ctx.selection.focusCell(row, col);
     this.ctx.applySelection();
   }

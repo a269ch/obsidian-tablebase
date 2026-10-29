@@ -65,8 +65,6 @@ export class TableGrid {
       this.ctx.clearFocus();
     });
 
-    this.bindScrollWrapper(scrollWrapper);
-
     const { settings } = this.ctx;
     const showRowNumbers = this.ctx.isRowNumbersVisible();
 
@@ -98,6 +96,7 @@ export class TableGrid {
     this.tbodyEl = tableEl.createEl("tbody");
     this.rowDrag.setBody(this.tbodyEl);
     this.renderBody();
+    this.bindScrollWrapper(scrollWrapper);
   }
 
   public get tableElement(): HTMLTableElement | null {
@@ -106,6 +105,8 @@ export class TableGrid {
 
   private bindScrollWrapper(scrollWrapper: HTMLElement): void {
     const { filterState } = this.ctx;
+    const savedScrollLeft = filterState.scrollLeft ?? 0;
+    const savedScrollTop = filterState.scrollTop ?? 0;
     // Each render builds a fresh wrapper, so drop what was bound to the old one.
     const registry = this.scrollRegistry;
     registry.disposeAll();
@@ -121,6 +122,7 @@ export class TableGrid {
 
     registry.listen(scrollWrapper, "scroll", () => {
       filterState.scrollLeft = scrollWrapper.scrollLeft;
+      filterState.scrollTop = scrollWrapper.scrollTop;
     });
 
     if (typeof ResizeObserver !== "undefined") {
@@ -129,15 +131,24 @@ export class TableGrid {
       registry.addFn(() => observer.disconnect());
     }
 
-    // The wrapper is still detached while the view is being built, so both
-    // measuring and restoring the offset have to wait for layout.
+    const restoreScroll = (): void => {
+      scrollWrapper.scrollLeft = savedScrollLeft;
+      scrollWrapper.scrollTop = savedScrollTop;
+    };
+    // The view container is appended by its caller after render() returns.
+    // Restore in a microtask so layout exists, but before the next paint.
+    restoreScroll();
+    if (typeof queueMicrotask === "function") {
+      queueMicrotask(restoreScroll);
+    }
+
     registry.animationFrame(() => {
       syncVisibleWidth();
-      scrollWrapper.scrollLeft = filterState.scrollLeft ?? 0;
     });
   }
 
   private renderHead(tableEl: HTMLTableElement, showRowNumbers: boolean): void {
+    this.renderColumnGroup(tableEl, showRowNumbers);
     const thead = tableEl.createEl("thead");
     const headerRow = thead.createEl("tr");
 
@@ -150,6 +161,22 @@ export class TableGrid {
     });
 
     this.renderAddColumnHeader(headerRow);
+  }
+
+  private renderColumnGroup(tableEl: HTMLTableElement, showRowNumbers: boolean): void {
+    const colgroup = tableEl.createEl("colgroup");
+    if (showRowNumbers) {
+      const indexCol = colgroup.createEl("col", { cls: "ms-db-col-index" });
+      setFixedWidth(indexCol, INDEX_COLUMN_WIDTH);
+    }
+    for (const col of this.ctx.getVisibleColumns()) {
+      const colEl = colgroup.createEl("col", {
+        attr: { "data-column-index": `${col.index}` },
+      });
+      if (col.width) setFixedWidth(colEl, col.width);
+    }
+    const addCol = colgroup.createEl("col", { cls: "ms-db-col-add" });
+    setFixedWidth(addCol, ADD_COLUMN_WIDTH);
   }
 
   private renderIndexHeader(headerRow: HTMLTableRowElement): void {
@@ -247,7 +274,15 @@ export class TableGrid {
     });
 
     const resizer = th.createDiv({ cls: "ms-col-resizer" });
-    bindColumnResizer(this.ctx.registry, resizer, th, col);
+    bindColumnResizer(
+      this.ctx.registry,
+      resizer,
+      th,
+      col,
+      this.tableEl!,
+      this.ctx.getVisibleColumns(),
+      this.ctx.actions.onColumnResize
+    );
   }
 
   private toggleColumnMenu(
@@ -311,7 +346,7 @@ export class TableGrid {
 
     // The bar is the only way into the calculations, so it is always there;
     // its cells stay blank until hovered.
-    if (this.ctx.settings.enableCalculations && visibleColumns.length > 0) {
+    if (this.ctx.filterState.showCalculationRow === true && visibleColumns.length > 0) {
       this.renderCalculationBar(tableEl, visibleRows, visibleColumns, showRowNumbers);
     }
 

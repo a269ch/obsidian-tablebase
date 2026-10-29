@@ -611,8 +611,12 @@ input[type="text"].ms-filter-value-input:focus {
   min-width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  table-layout: auto;
+  table-layout: fixed;
   margin: 0;
+}
+
+.ms-db-grid-table.is-resizing-columns {
+  transition: none;
 }
 
 .markdown-rendered .ms-notion-database-container table.ms-db-grid-table,
@@ -2612,5 +2616,4 @@ input[type="text"].ms-modal-name-input.is-invalid {
     display: none;
   }
 }
-
 
