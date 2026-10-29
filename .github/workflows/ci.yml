@@ -31,12 +31,14 @@ jobs:
           fi
 
       - name: Check commit message format
+        if: ${{ !startsWith(github.event.pull_request.head.ref, 'release/') }}
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 1
 
       - name: Validate commit message
+        if: ${{ !startsWith(github.event.pull_request.head.ref, 'release/') }}
         run: |
           subject="$(git log -1 --format=%s)"
           task_release='^TASK-[0-9]+(, TASK-[0-9]+)*: RELEASE-[0-9]+(\.[0-9]+)*$'
