@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
-import { parseLinkTokens, renderTextWithLinks } from "../src/utils/link-renderer";
+import { parseLinkTokens, renderTextWithLinks, stripCodeSpans, toPlainText } from "../src/utils/link-renderer";
 import { installObsidianDomHelpers } from "./helpers/obsidian-dom";
 
 describe("link-renderer", () => {
@@ -157,5 +157,57 @@ describe("link-renderer", () => {
     expect(onExternalClick).toHaveBeenCalledTimes(1);
     expect(onInternalClick).toHaveBeenCalledTimes(1);
     expect(parentDblClick).not.toHaveBeenCalled();
+  });
+  it("should parse inline code spans and leave links inside them as code", () => {
+    expect(parseLinkTokens("Loose in `System/AI` and `[[Note]]`")).toEqual([
+      { type: "text", text: "Loose in " },
+      { type: "code", text: "System/AI" },
+      { type: "text", text: " and " },
+      { type: "code", text: "[[Note]]" },
+    ]);
+  });
+
+  it("should follow CommonMark backtick runs for code spans", () => {
+    // A longer run holds a backtick; one space each side is stripped.
+    expect(parseLinkTokens("`` a`b ``")).toEqual([{ type: "code", text: "a`b" }]);
+    expect(parseLinkTokens("`  `")).toEqual([{ type: "code", text: "  " }]);
+    // A run closes only on a run of the same length.
+    expect(parseLinkTokens("``a`b``")).toEqual([{ type: "code", text: "a`b" }]);
+    // Unmatched and escaped backticks stay text.
+    expect(parseLinkTokens("a ` b")).toEqual([{ type: "text", text: "a ` b" }]);
+    expect(parseLinkTokens("\\`a`")).toEqual([{ type: "text", text: "\\`a`" }]);
+    expect(parseLinkTokens("``a`")).toEqual([{ type: "text", text: "``a`" }]);
+  });
+
+  it("should keep a link whole when a code span sits in its label", () => {
+    expect(parseLinkTokens("see [`api`](https://e.test/api) or `https://e.test/x`")).toEqual([
+      { type: "text", text: "see " },
+      { type: "external", text: "api", href: "https://e.test/api" },
+      { type: "text", text: " or " },
+      { type: "code", text: "https://e.test/x" },
+    ]);
+  });
+
+  it("should treat line endings in a code span as spaces", () => {
+    expect(parseLinkTokens("`a\rb\r\nc`")).toEqual([{ type: "code", text: "a b c" }]);
+    expect(parseLinkTokens("` \t `")).toEqual([{ type: "code", text: "\t" }]);
+  });
+
+  it("should strip code spans only, leaving links as written", () => {
+    expect(stripCodeSpans("`Done` and [[Page]] `` a`b ``")).toBe("Done and [[Page]] a`b");
+  });
+
+  it("should flatten code spans to their text", () => {
+    expect(toPlainText("Loose in `System/AI`")).toBe("Loose in System/AI");
+  });
+
+  it("should render a code span as a styled span, not a code element", () => {
+    const container = document.createElement("div");
+    renderTextWithLinks(container, "Run `= this.file.name` now");
+    const code = container.querySelector(".ms-cell-code");
+    expect(code?.tagName).toBe("SPAN");
+    expect(code?.textContent).toBe("= this.file.name");
+    expect(container.querySelector("code")).toBeNull();
+    expect(container.textContent).toBe("Run = this.file.name now");
   });
 });

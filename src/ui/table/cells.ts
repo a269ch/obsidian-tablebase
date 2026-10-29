@@ -4,7 +4,7 @@ import { parseCellTags } from "../../core/tag-parser";
 import { ColumnAlignment, MarkdownTableRow, TableColumn } from "../../types";
 import { appendIcon } from "../../utils/dom";
 import { attachStrictNumericInputHandlers, sanitizeNumericCellValue } from "../../utils/input";
-import { renderTextWithLinks } from "../../utils/link-renderer";
+import { renderTextWithLinks, stripCodeSpans } from "../../utils/link-renderer";
 import { ICON_TYPE_DATE } from "../icons";
 import { DatePickerPopover } from "../modals/date-picker-popover";
 import { SingleSelectPopover } from "../modals/single-select-popover";
@@ -46,19 +46,20 @@ export class CellRenderer {
     colIndex: number
   ): void {
     const rawValue = row.cells[colIndex] || "";
+    const displayValue = stripCodeSpans(rawValue);
 
     switch (col.type) {
       case "checkbox":
-        this.renderCheckbox(td, row, colIndex, rawValue);
+        this.renderCheckbox(td, row, colIndex, displayValue);
         break;
       case "date":
-        this.renderDate(td, row, col, colIndex, rawValue);
+        this.renderDate(td, row, col, colIndex, displayValue, rawValue);
         break;
       case "select":
-        this.renderSingleSelect(td, row, col, colIndex, rawValue);
+        this.renderSingleSelect(td, row, col, colIndex, displayValue, rawValue);
         break;
       case "multi-select":
-        this.renderMultiSelect(td, row, col, colIndex, rawValue);
+        this.renderMultiSelect(td, row, col, colIndex, displayValue, rawValue);
         break;
       default:
         this.renderText(td, row, col, colIndex, rawValue);
@@ -99,18 +100,19 @@ export class CellRenderer {
     row: MarkdownTableRow,
     col: TableColumn,
     colIndex: number,
+    displayValue: string,
     rawValue: string
   ): void {
     const wrapper = td.createDiv({ cls: "ms-cell-date-wrapper" });
 
-    if (rawValue.trim()) {
+    if (displayValue.trim()) {
       appendIcon(wrapper.createSpan({ cls: "ms-date-icon" }), ICON_TYPE_DATE);
       const targetFormat =
         col.dateFormat ?? this.ctx.settings.dateFormat ?? "YYYY-MM-DD";
-      const parsedDate = parseAnyDate(rawValue, targetFormat);
+      const parsedDate = parseAnyDate(displayValue, targetFormat);
       const displayText = parsedDate
         ? formatDateByOption(parsedDate, targetFormat)
-        : rawValue;
+        : displayValue;
       wrapper.createSpan({ cls: "ms-date-text", text: displayText });
     } else {
       wrapper.createSpan({ cls: "ms-cell-empty-placeholder", text: "Empty" });
@@ -127,9 +129,10 @@ export class CellRenderer {
     row: MarkdownTableRow,
     col: TableColumn,
     colIndex: number,
+    displayValue: string,
     rawValue: string
   ): void {
-    const tags = parseCellTags(rawValue, this.ctx.settings.customTagColors);
+    const tags = parseCellTags(displayValue, this.ctx.settings.customTagColors);
     const container = td.createDiv({ cls: "ms-cell-badges-container is-single-select" });
 
     if (tags.length === 0) {
@@ -158,9 +161,10 @@ export class CellRenderer {
     row: MarkdownTableRow,
     col: TableColumn,
     colIndex: number,
+    displayValue: string,
     rawValue: string
   ): void {
-    const tags = parseCellTags(rawValue, this.ctx.settings.customTagColors);
+    const tags = parseCellTags(displayValue, this.ctx.settings.customTagColors);
     const container = td.createDiv({ cls: "ms-cell-badges-container" });
 
     if (tags.length === 0) {
@@ -193,13 +197,13 @@ export class CellRenderer {
     colIndex: number,
     rawValue: string
   ): void {
-    const isNumber = col.type === "number" || isNumericCell(rawValue);
+    const isNumber = col.type === "number" || isNumericCell(stripCodeSpans(rawValue));
     const wrapper = td.createDiv({
       cls: `ms-cell-text-wrapper ${isNumber ? "is-number" : ""}`,
     });
 
     if (isNumber) {
-      wrapper.textContent = rawValue;
+      wrapper.textContent = stripCodeSpans(rawValue);
     } else {
       renderTextWithLinks(wrapper, rawValue, {
         onExternalClick: (url, e) => {
@@ -307,7 +311,7 @@ export class CellRenderer {
     td.classList.add("is-editing");
 
     const col = this.ctx.columns[colIndex];
-    const isNumber = col?.type === "number" || isNumericCell(currentValue);
+    const isNumber = col?.type === "number" || isNumericCell(stripCodeSpans(currentValue));
     const alignment = col ? resolveColumnAlignment(col) : (isNumber ? "right" : "left");
 
     const input = td.createEl("input", {

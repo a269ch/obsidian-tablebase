@@ -1,6 +1,7 @@
 import { MarkdownTableRow, SortDirection, SortRule, TableColumn } from "../types";
 import { parseCellTags } from "./tag-parser";
 import { compareDateStrings } from "./date-utils";
+import { stripCodeSpans } from "../utils/link-renderer";
 
 const CHECKED_VALUES = new Set<string>([
   "[x]",
@@ -91,8 +92,8 @@ export function compareRowsByColumn(
   direction: SortDirection,
   columnType: TableColumn["type"] = "text"
 ): number {
-  const valA = a.cells[columnIndex] || "";
-  const valB = b.cells[columnIndex] || "";
+  const valA = stripCodeSpans(a.cells[columnIndex] || "");
+  const valB = stripCodeSpans(b.cells[columnIndex] || "");
 
   const isEmptyA = isEmptyCell(valA);
   const isEmptyB = isEmptyCell(valB);
