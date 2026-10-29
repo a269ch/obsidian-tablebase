@@ -1,4 +1,4 @@
-import { App } from "obsidian";
+import { App, Notice } from "obsidian";
 import {
   addColumnToDocument,
   addRowToDocument,
@@ -44,6 +44,7 @@ export interface CodeBlockViewParams {
   sourcePath: string;
   tableData: MarkdownTableData;
   initialSource: string;
+  getLineStart?: () => number | undefined;
 }
 
 export interface InlineTableViewParams {
@@ -97,10 +98,26 @@ export class TableViewController {
   public createCodeBlockView(params: CodeBlockViewParams): NotionTableView {
     const { sourcePath, tableData } = params;
     let currentSource = params.initialSource;
+    let pendingSave: Promise<void> = Promise.resolve();
 
-    const persist: PersistOperation = async () => {
-      await this.syncService.syncCodeBlock(sourcePath, tableData, currentSource);
-      currentSource = serializeMarkdownTable(tableData);
+    // Saves run one at a time so each finds the block as the previous one left it.
+    const persist: PersistOperation = () => {
+      const save = pendingSave.then(async () => {
+        const written = serializeMarkdownTable(tableData);
+        const saved = await this.syncService.syncCodeBlock(
+          sourcePath,
+          tableData,
+          currentSource,
+          params.getLineStart?.()
+        );
+        if (!saved) {
+          new Notice("TableBase: could not find this table in the note, so the change was not saved.");
+          return;
+        }
+        currentSource = written;
+      });
+      pendingSave = save.catch(() => undefined);
+      return save;
     };
 
     return this.createView(tableData, persist, sourcePath);
