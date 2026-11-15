@@ -480,4 +480,209 @@ describe("KanbanView", () => {
     expect(badge?.querySelector(".ms-kanban-prop-value")?.textContent).toBe("94");
   });
 
+  it("should render multi-select rows under every assigned tag column with accurate counts (#26)", () => {
+    const columns: TableColumn[] = [
+      { index: 0, name: "Task", type: "text" },
+      {
+        index: 1,
+        name: "Tags",
+        type: "multi-select",
+        uniqueTags: [
+          { id: "work", name: "work", color: "blue" },
+          { id: "urgent", name: "urgent", color: "red" },
+          { id: "personal", name: "personal", color: "green" },
+        ],
+      },
+    ];
+    const tableData: MarkdownTableData = {
+      id: "table-multi",
+      startLine: 0,
+      endLine: 4,
+      rawMarkdown: "",
+      headers: ["Task", "Tags"],
+      alignments: ["---", "---"],
+      rows: [
+        { rowIndex: 0, cells: ["Ship v0.1.3", "#work #urgent"], rawLine: "| Ship v0.1.3 | #work #urgent |" },
+        { rowIndex: 1, cells: ["Buy groceries", "#personal"], rawLine: "| Buy groceries | #personal |" },
+        { rowIndex: 2, cells: ["Backlog idea", ""], rawLine: "| Backlog idea |  |" },
+      ],
+    };
+
+    const kanban = new KanbanView({
+      app: {} as App,
+      sourcePath: "notes/test.md",
+      tableData,
+      columns,
+      filterState: { ...defaultFilterState, groupByColumnIndex: 1 },
+      settings: { ...DEFAULT_SETTINGS },
+      actions: createActions(),
+      onSwitchView: vi.fn(),
+    });
+
+    const el = kanban.getElement();
+    document.body.appendChild(el);
+
+    const workCol = el.querySelector<HTMLElement>('.ms-kanban-column[data-group-name="work"]');
+    const urgentCol = el.querySelector<HTMLElement>('.ms-kanban-column[data-group-name="urgent"]');
+    const personalCol = el.querySelector<HTMLElement>('.ms-kanban-column[data-group-name="personal"]');
+    const noStatusCol = el.querySelector<HTMLElement>('.ms-kanban-column[data-group-name="__NO_STATUS__"]');
+
+    expect(workCol?.querySelectorAll(".ms-kanban-card-title").length).toBe(1);
+    expect(workCol?.querySelector(".ms-kanban-count-pill")?.textContent).toBe("1");
+    expect(urgentCol?.querySelectorAll(".ms-kanban-card-title").length).toBe(1);
+    expect(urgentCol?.querySelector(".ms-kanban-count-pill")?.textContent).toBe("1");
+    expect(personalCol?.querySelectorAll(".ms-kanban-card-title").length).toBe(1);
+    expect(noStatusCol?.querySelectorAll(".ms-kanban-card-title").length).toBe(1);
+
+    // Other tags remain visible on the card inside a specific tag column.
+    const workCardTags = Array.from(
+      workCol?.querySelectorAll<HTMLElement>(".ms-kanban-card-properties .ms-tag-badge") ?? []
+    ).map((b) => b.textContent?.trim());
+    expect(workCardTags).toEqual(["urgent"]);
+  });
+
+  it("should preserve other tags when dragging a multi-select card between columns (#26)", async () => {
+    const columns: TableColumn[] = [
+      { index: 0, name: "Task", type: "text" },
+      {
+        index: 1,
+        name: "Tags",
+        type: "multi-select",
+        uniqueTags: [
+          { id: "work", name: "work", color: "blue" },
+          { id: "urgent", name: "urgent", color: "red" },
+          { id: "personal", name: "personal", color: "green" },
+        ],
+      },
+    ];
+    const tableData: MarkdownTableData = {
+      id: "table-multi-dnd",
+      startLine: 0,
+      endLine: 3,
+      rawMarkdown: "",
+      headers: ["Task", "Tags"],
+      alignments: ["---", "---"],
+      rows: [
+        { rowIndex: 0, cells: ["Alpha", "#work #urgent"], rawLine: "| Alpha | #work #urgent |" },
+        { rowIndex: 1, cells: ["Beta", "#work"], rawLine: "| Beta | #work |" },
+      ],
+    };
+
+    const actions = createActions();
+    const kanban = new KanbanView({
+      app: {} as App,
+      sourcePath: "notes/test.md",
+      tableData,
+      columns,
+      filterState: { ...defaultFilterState, groupByColumnIndex: 1 },
+      settings: { ...DEFAULT_SETTINGS, defaultTagFormat: "hashtag" },
+      actions,
+      onSwitchView: vi.fn(),
+    });
+
+    const el = kanban.getElement();
+    document.body.appendChild(el);
+
+    const store = new Map<string, string>();
+    const mockDataTransfer = {
+      setData: (type: string, value: string) => store.set(type, value),
+      getData: (type: string) => store.get(type) ?? "",
+    };
+
+    // Drag Alpha from "work" onto "personal" list: replaces "work" with "personal", keeps "urgent".
+    const alphaCard = el.querySelector<HTMLElement>(
+      '.ms-kanban-column[data-group-name="work"] .ms-kanban-card'
+    );
+    const personalList = el.querySelector<HTMLElement>(
+      '.ms-kanban-column[data-group-name="personal"] .ms-kanban-cards-list'
+    );
+    const dragStart = new Event("dragstart", { bubbles: true });
+    Object.defineProperty(dragStart, "dataTransfer", { value: mockDataTransfer });
+    alphaCard?.dispatchEvent(dragStart);
+
+    const dropPersonal = new Event("drop", { bubbles: true });
+    Object.defineProperty(dropPersonal, "dataTransfer", { value: mockDataTransfer });
+    personalList?.dispatchEvent(dropPersonal);
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(actions.onCellUpdate).toHaveBeenLastCalledWith(0, 1, "#urgent #personal");
+
+    // Drag Alpha within "work" onto Beta: reorders without stripping "#urgent".
+    vi.clearAllMocks();
+    store.clear();
+    const workCards = el.querySelectorAll<HTMLElement>(
+      '.ms-kanban-column[data-group-name="work"] .ms-kanban-card'
+    );
+    const dragStartSame = new Event("dragstart", { bubbles: true });
+    Object.defineProperty(dragStartSame, "dataTransfer", { value: mockDataTransfer });
+    workCards[0]?.dispatchEvent(dragStartSame);
+
+    const dropBeta = new Event("drop", { bubbles: true });
+    Object.defineProperty(dropBeta, "dataTransfer", { value: mockDataTransfer });
+    workCards[1]?.dispatchEvent(dropBeta);
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(actions.onCellUpdate).not.toHaveBeenCalled();
+    expect(actions.onReorderRows).toHaveBeenCalledWith(0, 0);
+
+    // Drag Alpha from "work" to No Tags clears tags.
+    vi.clearAllMocks();
+    store.clear();
+    const noStatusList = el.querySelector<HTMLElement>(
+      '.ms-kanban-column[data-group-name="__NO_STATUS__"] .ms-kanban-cards-list'
+    );
+    const dragStartClear = new Event("dragstart", { bubbles: true });
+    Object.defineProperty(dragStartClear, "dataTransfer", { value: mockDataTransfer });
+    workCards[0]?.dispatchEvent(dragStartClear);
+
+    const dropClear = new Event("drop", { bubbles: true });
+    Object.defineProperty(dropClear, "dataTransfer", { value: mockDataTransfer });
+    noStatusList?.dispatchEvent(dropClear);
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(actions.onCellUpdate).toHaveBeenLastCalledWith(0, 1, "");
+  });
+
+  it("should format + New prefilled tag using defaultTagFormat in multi-select boards (#26)", () => {
+    const columns: TableColumn[] = [
+      { index: 0, name: "Task", type: "text" },
+      {
+        index: 1,
+        name: "Tags",
+        type: "multi-select",
+        uniqueTags: [{ id: "work", name: "work", color: "blue" }],
+      },
+    ];
+    const tableData: MarkdownTableData = {
+      id: "table-new-tag",
+      startLine: 0,
+      endLine: 2,
+      rawMarkdown: "",
+      headers: ["Task", "Tags"],
+      alignments: ["---", "---"],
+      rows: [{ rowIndex: 0, cells: ["Alpha", "#work"], rawLine: "| Alpha | #work |" }],
+    };
+
+    const actions = createActions();
+    const kanban = new KanbanView({
+      app: {} as App,
+      sourcePath: "notes/test.md",
+      tableData,
+      columns,
+      filterState: { ...defaultFilterState, groupByColumnIndex: 1 },
+      settings: { ...DEFAULT_SETTINGS, defaultTagFormat: "hashtag" },
+      actions,
+      onSwitchView: vi.fn(),
+    });
+
+    const el = kanban.getElement();
+    document.body.appendChild(el);
+    const addBtn = el.querySelector<HTMLButtonElement>(
+      '.ms-kanban-column[data-group-name="work"] .ms-kanban-bottom-add-btn'
+    );
+    addBtn?.click();
+
+    expect(actions.onAddRow).toHaveBeenCalledWith(undefined, ["", "#work"]);
+  });
+
 });

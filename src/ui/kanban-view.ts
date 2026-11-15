@@ -3,14 +3,16 @@ import { resolveTagColor } from "../core/color-palette";
 import { formatDateByOption, parseAnyDate } from "../core/date-utils";
 import { evaluateFilterStateOnRow } from "../core/filter-engine";
 import { isCellChecked } from "../core/sort-engine";
-import { parseCellTags } from "../core/tag-parser";
+import { parseCellTags, formatTagsToCell } from "../core/tag-parser";
 import {
   DatabaseViewType,
   MarkdownTableData,
   MarkdownTableRow,
+  MultiSelectTag,
   PluginSettings,
   TableColumn,
   TableFilterState,
+  TagFormat,
 } from "../types";
 import { appendIcon, appendIconLabel } from "../utils/dom";
 import { attachStrictNumericInputHandlers, sanitizeNumericCellValue } from "../utils/input";
@@ -57,6 +59,7 @@ export class KanbanView {
   private options: KanbanViewOptions;
   private containerEl: HTMLElement;
   private groupByColIndex: number;
+  private draggedCard: { rowIndex: number; sourceGroup: string } | null = null;
 
   constructor(options: KanbanViewOptions) {
     this.options = options;
@@ -175,10 +178,23 @@ export class KanbanView {
     const noStatusRows: MarkdownTableRow[] = [];
     const tagGroups = new Map<string, MarkdownTableRow[]>();
     const unknownGroups = new Map<string, MarkdownTableRow[]>();
+    const tagKeyById = new Map<string, string>();
 
     for (const tag of groupByCol?.uniqueTags ?? []) {
       tagGroups.set(tag.name, []);
+      tagKeyById.set(tag.id.toLowerCase(), tag.name);
+      tagKeyById.set(tag.name.toLowerCase(), tag.name);
     }
+
+    const addToGroup = (key: string, row: MarkdownTableRow): void => {
+      const normalized = key.toLowerCase();
+      const resolvedKey = tagKeyById.get(normalized) ?? key;
+      if (!tagGroups.has(resolvedKey) && !unknownGroups.has(resolvedKey)) {
+        unknownGroups.set(resolvedKey, []);
+        tagKeyById.set(normalized, resolvedKey);
+      }
+      (tagGroups.get(resolvedKey) ?? unknownGroups.get(resolvedKey))?.push(row);
+    };
 
     for (const row of visibleRows) {
       const cellValue = stripCodeSpans(row.cells[this.groupByColIndex] || "").trim();
@@ -188,15 +204,35 @@ export class KanbanView {
       }
 
       const tags = parseCellTags(cellValue, this.options.settings.customTagColors);
+      if (groupByCol?.type === "multi-select") {
+        if (tags.length === 0) {
+          const fallbackKey = cellValue.replace(/^\[\[|\]\]$/g, "").trim();
+          if (!fallbackKey) {
+            noStatusRows.push(row);
+          } else {
+            addToGroup(fallbackKey, row);
+          }
+          continue;
+        }
+
+        const seenKeys = new Set<string>();
+        for (const tag of tags) {
+          const resolvedKey = tagKeyById.get(tag.id.toLowerCase()) ?? tag.name;
+          const seenKey = resolvedKey.toLowerCase();
+          if (seenKeys.has(seenKey)) continue;
+          seenKeys.add(seenKey);
+          addToGroup(resolvedKey, row);
+        }
+        continue;
+      }
+
       const key =
         tags.length > 0 ? tags[0].name : cellValue.replace(/^\[\[|\]\]$/g, "").trim();
-
-      if (!tagGroups.has(key)) {
-        if (!unknownGroups.has(key)) {
-          unknownGroups.set(key, []);
-        }
+      if (!key) {
+        noStatusRows.push(row);
+        continue;
       }
-      (tagGroups.get(key) ?? unknownGroups.get(key))?.push(row);
+      addToGroup(key, row);
     }
 
     Array.from(unknownGroups.keys())
@@ -276,21 +312,36 @@ export class KanbanView {
       const rowIndex = parseInt(e.dataTransfer?.getData("text/plain") ?? "", 10);
       if (isNaN(rowIndex)) return;
 
-      void this.options.actions.onCellUpdate(rowIndex, this.groupByColIndex, targetValue).then(() => {
+      const sourceGroup = this.readDragOrigin(e, rowIndex);
+      const nextValue = this.resolveDropCellValue(
+        rowIndex,
+        groupByCol,
+        groupName,
+        targetValue,
+        sourceGroup
+      );
+      if (nextValue === null) return;
+
+      void this.options.actions.onCellUpdate(rowIndex, this.groupByColIndex, nextValue).then(() => {
         this.render();
       });
     });
 
     for (const row of rows) {
-      this.renderCard(cardsList, row, targetValue);
+      this.renderCard(cardsList, row, groupName, targetValue, groupByCol);
     }
 
     const addBtn = colEl.createEl("button", { cls: "ms-kanban-bottom-add-btn" });
     appendIconLabel(addBtn, ICON_PLUS, "New");
     addBtn.addEventListener("click", () => {
       const prefilled = new Array<string>(this.options.columns.length).fill("");
-      if (isCheckboxGroup || !isNoStatus) {
+      if (isCheckboxGroup) {
         prefilled[this.groupByColIndex] = groupName;
+      } else if (!isNoStatus) {
+        prefilled[this.groupByColIndex] =
+          groupByCol?.type === "multi-select"
+            ? formatTagsToCell([groupName], this.options.settings.defaultTagFormat ?? "comma")
+            : groupName;
       }
       void this.options.actions.onAddRow(undefined, prefilled);
     });
@@ -299,17 +350,22 @@ export class KanbanView {
   private renderCard(
     cardsList: HTMLElement,
     row: MarkdownTableRow,
-    targetValue: string
+    groupName: string,
+    targetValue: string,
+    groupByCol: TableColumn | undefined
   ): void {
     const card = cardsList.createDiv({ cls: "ms-kanban-card" });
     card.setAttribute("draggable", "true");
 
     card.addEventListener("dragstart", (e) => {
+      this.draggedCard = { rowIndex: row.rowIndex, sourceGroup: groupName };
       e.dataTransfer?.setData("text/plain", `${row.rowIndex}`);
+      e.dataTransfer?.setData("application/x-tablebase-group", groupName);
       card.classList.add("is-dragging");
     });
 
     card.addEventListener("dragend", () => {
+      this.draggedCard = null;
       card.classList.remove("is-dragging");
       this.containerEl
         .querySelectorAll(".is-card-drop-target")
@@ -335,11 +391,24 @@ export class KanbanView {
       const fromIndex = parseInt(e.dataTransfer?.getData("text/plain") ?? "", 10);
       if (isNaN(fromIndex)) return;
 
+      const sourceGroup = this.readDragOrigin(e, fromIndex);
+      const nextValue = this.resolveDropCellValue(
+        fromIndex,
+        groupByCol,
+        groupName,
+        targetValue,
+        sourceGroup
+      );
+
       void (async () => {
-        await this.options.actions.onCellUpdate(fromIndex, this.groupByColIndex, targetValue);
+        if (nextValue !== null) {
+          await this.options.actions.onCellUpdate(fromIndex, this.groupByColIndex, nextValue);
+        }
         if (fromIndex !== row.rowIndex) {
           const targetIndex = getRowDropIndex(fromIndex, row.rowIndex);
           await this.options.actions.onReorderRows(fromIndex, targetIndex);
+        } else if (nextValue !== null) {
+          this.render();
         }
       })();
     });
@@ -373,7 +442,66 @@ export class KanbanView {
       this.openCardMenu(card, titleEl, row);
     });
 
-    this.renderCardProperties(card.createDiv({ cls: "ms-kanban-card-properties" }), row);
+    this.renderCardProperties(
+      card.createDiv({ cls: "ms-kanban-card-properties" }),
+      row,
+      groupName
+    );
+  }
+
+  private readDragOrigin(e: DragEvent, rowIndex: number): string | undefined {
+    const fromTransfer = e.dataTransfer?.getData("application/x-tablebase-group");
+    const sourceGroup =
+      fromTransfer ||
+      (this.draggedCard?.rowIndex === rowIndex ? this.draggedCard.sourceGroup : undefined);
+    this.draggedCard = null;
+    return sourceGroup || undefined;
+  }
+
+  private detectCellTagFormat(rawValue: string, fallback: TagFormat): TagFormat {
+    const trimmed = rawValue.trim();
+    if (!trimmed) return fallback;
+    if (/\[\[[^\]]+\]\]/.test(trimmed)) return "wikilink";
+    if (/(?:^|\s)#[^\s#,]+/.test(trimmed)) return "hashtag";
+    if (trimmed.includes(",")) return "comma";
+    return fallback;
+  }
+
+  private resolveDropCellValue(
+    rowIndex: number,
+    groupByCol: TableColumn | undefined,
+    targetGroup: string,
+    targetValue: string,
+    sourceGroup?: string
+  ): string | null {
+    if (sourceGroup && sourceGroup === targetGroup) {
+      return null;
+    }
+    if (groupByCol?.type !== "multi-select") {
+      return targetValue;
+    }
+    if (targetGroup === NO_STATUS_KEY) {
+      return "";
+    }
+
+    const row = this.options.tableData.rows.find((candidate) => candidate.rowIndex === rowIndex);
+    const rawValue = stripCodeSpans(row?.cells[this.groupByColIndex] ?? "").trim();
+    const currentTags = parseCellTags(rawValue, this.options.settings.customTagColors);
+    const fallbackFormat = this.options.settings.defaultTagFormat ?? "hashtag";
+    const format = this.detectCellTagFormat(rawValue, fallbackFormat);
+
+    const filteredNames = currentTags
+      .filter((tag) => {
+        if (!sourceGroup || sourceGroup === NO_STATUS_KEY) return true;
+        return tag.name.toLowerCase() !== sourceGroup.toLowerCase();
+      })
+      .map((tag) => tag.name);
+
+    const hasTarget = filteredNames.some(
+      (name) => name.toLowerCase() === targetGroup.toLowerCase()
+    );
+    const nextNames = hasTarget ? filteredNames : [...filteredNames, targetGroup];
+    return formatTagsToCell(nextNames, format);
   }
 
   private startTitleEdit(titleEl: HTMLElement, row: MarkdownTableRow): void {
@@ -438,15 +566,33 @@ export class KanbanView {
     mountFloatingPopover({ anchorEl: card, popoverEl: menu, offsetTop: 2 });
   }
 
-  private renderCardProperties(propsEl: HTMLElement, row: MarkdownTableRow): void {
+  private renderCardProperties(
+    propsEl: HTMLElement,
+    row: MarkdownTableRow,
+    currentGroupName: string
+  ): void {
     const { columns, filterState, settings } = this.options;
     const showEmpty = settings.showEmptyBoardProperties === true;
 
     columns.forEach((col, colIndex) => {
-      if (colIndex === 0 || colIndex === this.groupByColIndex) return;
+      if (colIndex === 0) return;
       if (filterState?.hiddenColumnIndices?.includes(colIndex)) return;
 
       const cellValue = (row.cells[colIndex] || "").trim();
+
+      if (colIndex === this.groupByColIndex) {
+        if (col.type !== "multi-select" || currentGroupName === NO_STATUS_KEY || !cellValue) {
+          return;
+        }
+        const remainingTags = parseCellTags(cellValue, settings.customTagColors).filter(
+          (tag) => tag.name.toLowerCase() !== currentGroupName.toLowerCase()
+        );
+        if (remainingTags.length > 0) {
+          this.renderMultiSelectTags(propsEl, row, col, colIndex, cellValue, remainingTags);
+        }
+        return;
+      }
+
       // An unchecked checkbox is a value of its own, so it is never "empty".
       if (!cellValue && !showEmpty && col.type !== "checkbox") return;
 
@@ -490,6 +636,17 @@ export class KanbanView {
       return;
     }
 
+    this.renderMultiSelectTags(propsEl, row, col, colIndex, cellValue, tags);
+  }
+
+  private renderMultiSelectTags(
+    propsEl: HTMLElement,
+    row: MarkdownTableRow,
+    col: TableColumn,
+    colIndex: number,
+    cellValue: string,
+    tags: MultiSelectTag[]
+  ): void {
     for (const tag of tags) {
       propsEl.appendChild(
         createTagBadge({
