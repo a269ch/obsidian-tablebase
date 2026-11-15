@@ -35,6 +35,7 @@ import { TagSelectModal } from "./modals/tag-select-modal";
 import { mountFloatingPopover } from "./popover";
 import { createTagBadge } from "./tag-badge";
 import { BoardViewActions } from "./table/types";
+import { createWideModeToggleButton } from "./wide-mode";
 
 export interface KanbanViewOptions {
   app: App;
@@ -45,6 +46,8 @@ export interface KanbanViewOptions {
   settings: PluginSettings;
   actions: BoardViewActions;
   onSwitchView: (view: DatabaseViewType) => void;
+  isWideMode?: boolean;
+  onToggleWideMode?: () => void;
 }
 
 const NO_STATUS_KEY = "__NO_STATUS__";
@@ -97,6 +100,9 @@ export class KanbanView {
 
   public render(): void {
     this.containerEl.empty();
+    if (!this.options.onToggleWideMode) {
+      this.containerEl.classList.toggle("is-wide-mode", this.isWideMode());
+    }
     this.renderToolbar();
 
     const groupByCol = this.options.columns[this.groupByColIndex] ?? this.options.columns[0];
@@ -149,6 +155,32 @@ export class KanbanView {
       }
       this.render();
     });
+
+    const rightHeader = topbar.createDiv({ cls: "ms-db-header-right" });
+    createWideModeToggleButton(rightHeader, this.isWideMode(), () =>
+      this.handleToggleWideMode()
+    );
+  }
+
+  private isWideMode(): boolean {
+    return (
+      this.options.isWideMode ??
+      this.options.filterState?.isWideMode ??
+      Boolean(this.options.settings.tableWideModes?.[this.options.tableData.id])
+    );
+  }
+
+  private handleToggleWideMode(): void {
+    if (this.options.onToggleWideMode) {
+      this.options.onToggleWideMode();
+      return;
+    }
+    const next = !this.isWideMode();
+    if (this.options.filterState) {
+      this.options.filterState.isWideMode = next;
+    }
+    this.containerEl.classList.toggle("is-wide-mode", next);
+    this.render();
   }
 
   private getVisibleRows(): MarkdownTableRow[] {

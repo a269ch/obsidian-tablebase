@@ -42,6 +42,7 @@ export interface TableViewActions {
   onSortChange(sortRules: SortRule[]): void;
   onTagColorChange(tagName: string, color: TagColor): Promise<void>;
   onColumnResize?(this: void, widths: Record<string, number>): Promise<void>;
+  onWideModeChange?(this: void, isWide: boolean): Promise<void>;
 }
 
 export type BoardViewActions = Pick<
@@ -71,6 +72,8 @@ export interface TableViewContext {
   readonly filterState: TableFilterState;
   readonly settings: PluginSettings;
   isRowNumbersVisible(): boolean;
+  isWideMode(): boolean;
+  toggleWideMode(): void;
   getVisibleColumns(): TableColumn[];
   render(): void;
   renderRows(): void;

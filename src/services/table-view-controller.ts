@@ -271,6 +271,13 @@ export class TableViewController {
       patch.tableSortRules = nextSortRules;
     }
 
+    if (latestSettings.tableWideModes?.[oldId] !== undefined) {
+      const nextWideModes = { ...latestSettings.tableWideModes };
+      nextWideModes[newId] = nextWideModes[oldId];
+      delete nextWideModes[oldId];
+      patch.tableWideModes = nextWideModes;
+    }
+
     if (Object.keys(patch).length > 0) {
       await updateSettings(patch);
     }
@@ -481,6 +488,17 @@ export class TableViewController {
           },
         };
         await this.settingsService.updateSettings({ tableColumnWidths });
+      },
+
+      onWideModeChange: async (isWide) => {
+        const currentSettings = this.settingsService.getSettings();
+        const tableWideModes = { ...(currentSettings.tableWideModes ?? {}) };
+        if (isWide) {
+          tableWideModes[tableData.id] = true;
+        } else {
+          delete tableWideModes[tableData.id];
+        }
+        await this.settingsService.updateSettings({ tableWideModes });
       },
     };
 

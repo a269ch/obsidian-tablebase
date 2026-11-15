@@ -11,6 +11,7 @@ import {
 } from "../icons";
 import { closeAllFloatingPopovers } from "../popover";
 import { TableMenus } from "./menus";
+import { createWideModeToggleButton } from "../wide-mode";
 import { TableViewContext } from "./types";
 
 const SEARCH_DEBOUNCE_MS = 120;
@@ -116,6 +117,10 @@ export class TableToolbar {
         this.menus.openExportMenu(exportBtn);
       }
     });
+
+    createWideModeToggleButton(rightHeader, this.ctx.isWideMode(), () =>
+      this.ctx.toggleWideMode()
+    );
   }
 
   private createActionButton(

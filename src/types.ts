@@ -141,6 +141,7 @@ export interface TableFilterState {
   stickyFirstColumn?: boolean;
   showRowNumbers?: boolean;
   showCalculationRow?: boolean;
+  isWideMode?: boolean;
   scrollLeft?: number;
   scrollTop?: number;
   boardScrollLeft?: number;
@@ -171,6 +172,7 @@ export interface PluginSettings {
   tableColumnWidths: Record<string, Record<string, number>>;
   tableBoardGroupOrders: Record<string, Record<string, string[]>>;
   tableSortRules?: Record<string, SortRule[]>;
+  tableWideModes: Record<string, boolean>;
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -193,6 +195,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   showEmptyBoardProperties: false,
   tableColumnWidths: {},
   tableBoardGroupOrders: {},
+  tableWideModes: {},
 };
 
 export interface MarkdownTableRow {
