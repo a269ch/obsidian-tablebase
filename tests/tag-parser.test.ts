@@ -91,12 +91,12 @@ describe("Tag Parser & Formatter", () => {
 
     it("should treat a column of single wikilinks as links, not tags", () => {
       const values = ["[[System Design]]", "[[Obsidian API]]", "[[REST]]"];
-      expect(looksLikeMultiSelect(values, "Заметка")).toBe(false);
+      expect(looksLikeMultiSelect(values, "Note")).toBe(false);
     });
 
     it("should still detect cells holding several wikilinks", () => {
       const values = ["[[Sync]] [[Network]]", "[[Libs]] [[Utils]]", "[[Core]]"];
-      expect(looksLikeMultiSelect(values, "Заметка")).toBe(true);
+      expect(looksLikeMultiSelect(values, "Note")).toBe(true);
     });
 
     it("should return false for regular single-value columns", () => {
@@ -108,22 +108,22 @@ describe("Tag Parser & Formatter", () => {
       expect(
         looksLikeMultiSelect(
           [
-            "[[prompts/CHAT02\\|CHAT02 — Сохраняемые сообщения, restart и корректный lifecycle]]",
-            "[CHAT04 — Sidebar диалогов: восстановление, переименование, удаление и временный режим](prompts/CHAT04.md)",
-            "[V2-OBS-01 — Безопасные logs, errors, panic и crash metadata](prompts/OBS01.md)",
+            "[[prompts/task02\\|TASK-02 — Persisted messages, restart and clean lifecycle]]",
+            "[TASK-04 — History sidebar: restore, rename, delete and temporary mode](prompts/task04.md)",
+            "[OBS-01 — Safe logs, errors, panic and crash metadata](prompts/obs01.md)",
           ],
-          "Задача / полный prompt"
+          "Task / full prompt"
         )
       ).toBe(false);
 
       expect(
         looksLikeMultiSelect(
           [
-            "CHAT02 — Сохраняемые сообщения, restart и корректный lifecycle",
-            "CHAT04 — Sidebar диалогов: восстановление, переименование, удаление и временный режим",
-            "V2-OBS-01 — Безопасные logs, errors, panic и crash metadata",
+            "TASK-02 — Persisted messages, restart and clean lifecycle",
+            "TASK-04 — History sidebar: restore, rename, delete and temporary mode",
+            "OBS-01 — Safe logs, errors, panic and crash metadata",
           ],
-          "Задача / полный prompt"
+          "Task / full prompt"
         )
       ).toBe(false);
 
