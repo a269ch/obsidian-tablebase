@@ -11,6 +11,7 @@ import { DATE_KEYWORDS, TYPE_ANNOTATION_REGEX } from "../../core/table-mutator";
 import { Disposable, DisposableRegistry } from "../../utils/lifecycle";
 import { KanbanView } from "../kanban-view";
 import { AddColumnModal } from "../modals/add-column-modal";
+import { WideModeController } from "../wide-mode";
 import { CellRenderer } from "./cells";
 import { RowDragController } from "./dnd";
 import { FilterPanel } from "./filter-panel";
@@ -39,6 +40,7 @@ export class NotionTableView implements Disposable, TableViewContext {
   private filterPanel: FilterPanel;
   private sortPanel: SortPanel;
   private keyboard: KeyboardController;
+  private wideMode: WideModeController;
   private keyboardBound = false;
   private disposed = false;
 
@@ -56,6 +58,7 @@ export class NotionTableView implements Disposable, TableViewContext {
 
     this.containerEl = createDiv({ cls: "ms-notion-database-container" });
     this.containerEl.tabIndex = 0;
+    this.wideMode = this.registry.add(new WideModeController(this.containerEl));
 
     const openAddColumnModal = (atIndex?: number): void => this.openAddColumnModal(atIndex);
 
@@ -89,6 +92,21 @@ export class NotionTableView implements Disposable, TableViewContext {
 
   public isRowNumbersVisible(): boolean {
     return this.filterState.showRowNumbers ?? Boolean(this.settings.showRowNumbers);
+  }
+
+  public isWideMode(): boolean {
+    return (
+      this.filterState.isWideMode ??
+      Boolean(this.settings.tableWideModes?.[this.tableData.id])
+    );
+  }
+
+  public toggleWideMode(): void {
+    const next = !this.isWideMode();
+    this.filterState.isWideMode = next;
+    this.actions.onFilterChange(this.filterState);
+    void this.actions.onWideModeChange?.(next);
+    this.render();
   }
 
   public getVisibleColumns(): TableColumn[] {
@@ -130,6 +148,12 @@ export class NotionTableView implements Disposable, TableViewContext {
   }
 
   public updateSettings(settings: PluginSettings): void {
+    const prevWide = Boolean(this.options.settings.tableWideModes?.[this.tableData.id]);
+    const nextWide = Boolean(settings.tableWideModes?.[this.tableData.id]);
+    if (prevWide !== nextWide) {
+      this.filterState.isWideMode = nextWide;
+    }
+
     this.options.settings = settings;
     this.options.columns = this.options.columns.map((col) => {
       const rawHeader = this.tableData.headers[col.index] || "";
@@ -183,6 +207,7 @@ export class NotionTableView implements Disposable, TableViewContext {
 
     this.menus.closeActivePopover();
     this.containerEl.empty();
+    this.wideMode.sync(this.isWideMode());
 
     if (this.filterState.viewType === "board") {
       this.renderBoard();
@@ -212,6 +237,8 @@ export class NotionTableView implements Disposable, TableViewContext {
       settings: this.settings,
       actions: this.actions,
       onSwitchView: (view) => this.switchView(view),
+      isWideMode: this.isWideMode(),
+      onToggleWideMode: () => this.toggleWideMode(),
     });
     this.containerEl.appendChild(kanban.getElement());
   }

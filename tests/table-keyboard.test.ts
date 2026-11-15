@@ -56,6 +56,8 @@ function createContext(tableData: MarkdownTableData, columns: TableColumn[]) {
     },
     settings: { ...DEFAULT_SETTINGS },
     isRowNumbersVisible: () => false,
+    isWideMode: () => false,
+    toggleWideMode: vi.fn(),
     getVisibleColumns: () => columns,
     render: vi.fn(),
     renderRows: vi.fn(),

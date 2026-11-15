@@ -152,6 +152,31 @@
   color: var(--ms-blue-accent);
 }
 
+.ms-wide-mode-btn {
+  padding: 4px 6px;
+}
+
+.ms-wide-mode-host,
+.el-table.ms-wide-mode-host,
+.table-wrapper.ms-wide-mode-host,
+.markdown-rendered .ms-wide-mode-host,
+.el-table:has(> .ms-notion-database-container.is-wide-mode),
+.el-pre:has(.ms-notion-database-container.is-wide-mode),
+.cm-embed-block:has(.ms-notion-database-container.is-wide-mode),
+.cm-preview-code-block:has(.ms-notion-database-container.is-wide-mode) {
+  overflow: visible;
+}
+
+.ms-notion-database-container.is-wide-mode,
+.ms-enhanced-table-wrapper > .ms-notion-database-container.is-wide-mode,
+.el-table.ms-enhanced-table-wrapper > .ms-notion-database-container.is-wide-mode,
+.markdown-rendered .ms-enhanced-table-wrapper > .ms-notion-database-container.is-wide-mode {
+  width: var(--ms-wide-width, calc(100% - 26px));
+  max-width: var(--ms-wide-width, none);
+  margin-left: var(--ms-wide-offset-left, 26px);
+  margin-right: 0;
+}
+
 .ms-group-by-wrapper {
   display: inline-flex;
   align-items: center;
@@ -2596,6 +2621,12 @@ input[type="text"].ms-modal-name-input.is-invalid {
 }
 
 @media print {
+  body .ms-notion-database-container.is-wide-mode {
+    width: auto;
+    max-width: calc(100% - 26px);
+    margin-left: 26px;
+  }
+
   body .ms-enhanced-table-wrapper > table.ms-table-hidden {
     display: table;
   }

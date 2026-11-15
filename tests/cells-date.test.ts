@@ -88,6 +88,8 @@ function createContext(columns: TableColumn[], rows: MarkdownTableRow[]) {
     filterState,
     settings: { ...DEFAULT_SETTINGS },
     isRowNumbersVisible: () => false,
+    isWideMode: () => false,
+    toggleWideMode: vi.fn(),
     getVisibleColumns: () => columns,
     render: vi.fn(),
     renderRows: vi.fn(),
