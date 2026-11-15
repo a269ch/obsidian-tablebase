@@ -109,6 +109,28 @@ export class NotionTableView implements Disposable, TableViewContext {
     this.render();
   }
 
+  public isBoardViewVisible(): boolean {
+    if (this.filterState.showBoardView !== undefined) {
+      return this.filterState.showBoardView;
+    }
+    const perTable = this.settings.tableBoardViews?.[this.tableData.id];
+    if (perTable !== undefined) {
+      return perTable;
+    }
+    return this.settings.showBoardView ?? true;
+  }
+
+  public toggleBoardView(): void {
+    const next = !this.isBoardViewVisible();
+    this.filterState.showBoardView = next;
+    if (!next && this.filterState.viewType === "board") {
+      this.filterState.viewType = "table";
+    }
+    this.actions.onFilterChange(this.filterState);
+    void this.actions.onBoardViewChange?.(next);
+    this.render();
+  }
+
   public getVisibleColumns(): TableColumn[] {
     const hidden = this.filterState.hiddenColumnIndices ?? [];
     return this.columns.filter((col) => !hidden.includes(col.index));
@@ -131,6 +153,7 @@ export class NotionTableView implements Disposable, TableViewContext {
 
   public syncSettings(settings: PluginSettings): void {
     this.options.settings = settings;
+    this.filterState.showBoardView = settings.tableBoardViews?.[this.tableData.id];
   }
 
   public rebindState(
@@ -143,6 +166,9 @@ export class NotionTableView implements Disposable, TableViewContext {
     this.options.filterState = filterState;
     filterState.viewType ??= "table";
     filterState.hiddenColumnIndices ??= [];
+    if (!this.isBoardViewVisible() && filterState.viewType === "board") {
+      filterState.viewType = "table";
+    }
     this.selection.restore(filterState.selection);
     this.render();
   }
@@ -154,7 +180,13 @@ export class NotionTableView implements Disposable, TableViewContext {
       this.filterState.isWideMode = nextWide;
     }
 
+    this.filterState.showBoardView = settings.tableBoardViews?.[this.tableData.id];
+
     this.options.settings = settings;
+    if (!this.isBoardViewVisible() && this.filterState.viewType === "board") {
+      this.filterState.viewType = "table";
+      this.actions.onFilterChange(this.filterState);
+    }
     this.options.columns = this.options.columns.map((col) => {
       const rawHeader = this.tableData.headers[col.index] || "";
       const isDateCol =
@@ -182,6 +214,9 @@ export class NotionTableView implements Disposable, TableViewContext {
   }
 
   public switchView(view: DatabaseViewType): void {
+    if (view === "board" && !this.isBoardViewVisible()) {
+      return;
+    }
     this.filterState.viewType = view;
     this.actions.onFilterChange(this.filterState);
     this.render();
@@ -208,6 +243,10 @@ export class NotionTableView implements Disposable, TableViewContext {
     this.menus.closeActivePopover();
     this.containerEl.empty();
     this.wideMode.sync(this.isWideMode());
+
+    if (!this.isBoardViewVisible() && this.filterState.viewType === "board") {
+      this.filterState.viewType = "table";
+    }
 
     if (this.filterState.viewType === "board") {
       this.renderBoard();

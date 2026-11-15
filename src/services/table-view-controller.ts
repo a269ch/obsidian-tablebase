@@ -250,32 +250,15 @@ export class TableViewController {
     const latestSettings = this.settingsService.getSettings();
     const patch: Partial<PluginSettings> = {};
 
-    if (latestSettings.tableColumnWidths?.[oldId]) {
-      const nextWidths = { ...latestSettings.tableColumnWidths };
-      nextWidths[newId] = nextWidths[oldId];
-      delete nextWidths[oldId];
-      patch.tableColumnWidths = nextWidths;
-    }
-
-    if (latestSettings.tableBoardGroupOrders?.[oldId]) {
-      const nextOrders = { ...latestSettings.tableBoardGroupOrders };
-      nextOrders[newId] = nextOrders[oldId];
-      delete nextOrders[oldId];
-      patch.tableBoardGroupOrders = nextOrders;
-    }
-
-    if (latestSettings.tableSortRules?.[oldId]) {
-      const nextSortRules = { ...latestSettings.tableSortRules };
-      nextSortRules[newId] = nextSortRules[oldId];
-      delete nextSortRules[oldId];
-      patch.tableSortRules = nextSortRules;
-    }
-
-    if (latestSettings.tableWideModes?.[oldId] !== undefined) {
-      const nextWideModes = { ...latestSettings.tableWideModes };
-      nextWideModes[newId] = nextWideModes[oldId];
-      delete nextWideModes[oldId];
-      patch.tableWideModes = nextWideModes;
+    const perTableKeys = [
+      "tableColumnWidths",
+      "tableBoardGroupOrders",
+      "tableSortRules",
+      "tableWideModes",
+      "tableBoardViews",
+    ] as const;
+    for (const key of perTableKeys) {
+      moveTableSettingKey(patch, latestSettings, key, oldId, newId);
     }
 
     if (Object.keys(patch).length > 0) {
@@ -288,15 +271,12 @@ export class TableViewController {
     persist: PersistOperation,
     sourcePath: string
   ): NotionTableView {
-    let silentSettingsUpdates = 0;
+    const silentSnapshots = new WeakSet<PluginSettings>();
 
     const updateSettingsSilently = async (patch: Partial<PluginSettings>): Promise<void> => {
-      silentSettingsUpdates++;
-      try {
-        await this.settingsService.updateSettings(patch);
-      } finally {
-        silentSettingsUpdates = Math.max(0, silentSettingsUpdates - 1);
-      }
+      const savePromise = this.settingsService.updateSettings(patch);
+      silentSnapshots.add(this.settingsService.getSettings());
+      await savePromise;
     };
 
     const settings = this.settingsService.getSettings();
@@ -500,6 +480,18 @@ export class TableViewController {
         }
         await this.settingsService.updateSettings({ tableWideModes });
       },
+
+      onBoardViewChange: async (isVisible) => {
+        const currentSettings = this.settingsService.getSettings();
+        const defaultVisible = currentSettings.showBoardView ?? true;
+        const tableBoardViews = { ...(currentSettings.tableBoardViews ?? {}) };
+        if (isVisible === defaultVisible) {
+          delete tableBoardViews[tableData.id];
+        } else {
+          tableBoardViews[tableData.id] = isVisible;
+        }
+        await this.settingsService.updateSettings({ tableBoardViews });
+      },
     };
 
     view = new NotionTableView({
@@ -523,7 +515,7 @@ export class TableViewController {
     });
 
     const unsubscribe = this.settingsService.subscribe((updatedSettings) => {
-      if (silentSettingsUpdates > 0) {
+      if (silentSnapshots.has(updatedSettings)) {
         view?.syncSettings(updatedSettings);
         return;
       }
@@ -723,4 +715,26 @@ function createDocumentTransform(
           tableIndex
         );
   }
+}
+
+type PerTableSettingKey =
+  | "tableColumnWidths"
+  | "tableBoardGroupOrders"
+  | "tableSortRules"
+  | "tableWideModes"
+  | "tableBoardViews";
+
+/** Moves a per-table settings entry from oldId to newId when present. */
+function moveTableSettingKey<K extends PerTableSettingKey>(
+  patch: Partial<PluginSettings>,
+  settings: PluginSettings,
+  key: K,
+  oldId: string,
+  newId: string
+): void {
+  const map = settings[key] as Record<string, unknown> | undefined;
+  if (!map || map[oldId] === undefined) return;
+  const next = { ...map, [newId]: map[oldId] };
+  delete next[oldId];
+  patch[key] = next as PluginSettings[K];
 }

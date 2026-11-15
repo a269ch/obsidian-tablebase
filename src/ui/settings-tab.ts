@@ -84,6 +84,14 @@ export class TableBaseSettingTab extends PluginSettingTab {
         },
       },
       {
+        name: "Show Board view",
+        desc: "Show the Table / Board view switcher above tables. Can also be toggled per table in Properties.",
+        control: {
+          type: "toggle",
+          key: "showBoardView",
+        },
+      },
+      {
         type: "page",
         name: "Custom tag colors",
         desc: "Customize colors for specific tags. These override automatic colors across all tables and boards.",
@@ -285,6 +293,19 @@ export class TableBaseSettingTab extends PluginSettingTab {
           .setValue(settings.showEmptyBoardProperties ?? false)
           .onChange(async (value) => {
             await this.settingsService.updateSettings({ showEmptyBoardProperties: value });
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Show Board view")
+      .setDesc(
+        "Show the Table / Board view switcher above tables. Can also be toggled per table in Properties."
+      )
+      .addToggle((toggle) =>
+        toggle
+          .setValue(settings.showBoardView ?? true)
+          .onChange(async (value) => {
+            await this.settingsService.updateSettings({ showBoardView: value });
           })
       );
   }
