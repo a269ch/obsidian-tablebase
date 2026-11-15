@@ -401,22 +401,22 @@ describe("KanbanView", () => {
 
   it("should draw wikilinks in card properties instead of printing them", () => {
     const columns: TableColumn[] = [
-      { index: 0, name: "Модуль", type: "text" },
-      { index: 1, name: "Статус", type: "select", uniqueTags: [{ id: "todo", name: "Todo", color: "blue" }] },
-      { index: 2, name: "Заметка", type: "text" },
+      { index: 0, name: "Module", type: "text" },
+      { index: 1, name: "Status", type: "select", uniqueTags: [{ id: "todo", name: "Todo", color: "blue" }] },
+      { index: 2, name: "Note", type: "text" },
     ];
     const tableData: MarkdownTableData = {
       id: "table-links",
       startLine: 0,
       endLine: 3,
       rawMarkdown: "",
-      headers: ["Модуль", "Статус", "Заметка"],
+      headers: ["Module", "Status", "Note"],
       alignments: ["---", "---", "---"],
       rows: [
         {
           rowIndex: 0,
-          cells: ["Ядро", "Todo", "[[System Design]]"],
-          rawLine: "| Ядро | Todo | [[System Design]] |",
+          cells: ["Core", "Todo", "[[System Design]]"],
+          rawLine: "| Core | Todo | [[System Design]] |",
         },
       ],
     };
@@ -444,19 +444,19 @@ describe("KanbanView", () => {
 
   it("should label numeric card properties with their column name", () => {
     const columns: TableColumn[] = [
-      { index: 0, name: "Модуль", type: "text" },
-      { index: 1, name: "Статус", type: "select", uniqueTags: [{ id: "todo", name: "Todo", color: "blue" }] },
-      { index: 2, name: "Покрытие (%)", type: "number" },
+      { index: 0, name: "Module", type: "text" },
+      { index: 1, name: "Status", type: "select", uniqueTags: [{ id: "todo", name: "Todo", color: "blue" }] },
+      { index: 2, name: "Coverage (%)", type: "number" },
     ];
     const tableData: MarkdownTableData = {
       id: "table-numbers",
       startLine: 0,
       endLine: 3,
       rawMarkdown: "",
-      headers: ["Модуль", "Статус", "Покрытие (%)"],
+      headers: ["Module", "Status", "Coverage (%)"],
       alignments: ["---", "---", "---:"],
       rows: [
-        { rowIndex: 0, cells: ["Ядро", "Todo", "94"], rawLine: "| Ядро | Todo | 94 |" },
+        { rowIndex: 0, cells: ["Core", "Todo", "94"], rawLine: "| Core | Todo | 94 |" },
       ],
     };
 
@@ -476,7 +476,7 @@ describe("KanbanView", () => {
 
     const badge = el.querySelector<HTMLElement>(".ms-kanban-prop-badge.is-number");
     expect(badge).not.toBeNull();
-    expect(badge?.querySelector(".ms-kanban-prop-name")?.textContent).toBe("Покрытие (%)");
+    expect(badge?.querySelector(".ms-kanban-prop-name")?.textContent).toBe("Coverage (%)");
     expect(badge?.querySelector(".ms-kanban-prop-value")?.textContent).toBe("94");
   });
 

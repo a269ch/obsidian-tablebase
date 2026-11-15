@@ -538,14 +538,14 @@ describe("TablePostProcessor source parsing", () => {
   });
   it("should recover a type annotation the renderer dropped from the header", () => {
     const text = [
-      "| Модуль | Категория [text] |",
+      "| Module | Domain [text] |",
       "| --- | --- |",
-      "| Ядро | Architecture, Core |",
+      "| Core | Architecture, Core |",
     ].join("\n");
 
     // The rendered header lost its "[text]" suffix.
     const { processor, ctx } = createProcessor({ text, lineStart: 0, lineEnd: 2 });
-    const wrapper = buildRenderedTable(["Модуль", "Категория"], [["Ядро", "Architecture, Core"]]);
+    const wrapper = buildRenderedTable(["Module", "Domain"], [["Core", "Architecture, Core"]]);
 
     processor.process(wrapper, ctx);
 
@@ -555,15 +555,15 @@ describe("TablePostProcessor source parsing", () => {
   });
 
   it("should keep the rendered header when the source header carries Markdown", () => {
-    const text = ["| Модуль | **Категория** |", "| --- | --- |", "| Ядро | Core |"].join("\n");
+    const text = ["| Module | **Domain** |", "| --- | --- |", "| Core | Core |"].join("\n");
 
     const { processor, ctx } = createProcessor({ text, lineStart: 0, lineEnd: 2 });
-    const wrapper = buildRenderedTable(["Модуль", "Категория"], [["Ядро", "Core"]]);
+    const wrapper = buildRenderedTable(["Module", "Domain"], [["Core", "Core"]]);
 
     processor.process(wrapper, ctx);
 
     const names = Array.from(wrapper.querySelectorAll(".ms-db-col-name")).map((el) => el.textContent);
-    expect(names).toEqual(["Модуль", "Категория"]);
+    expect(names).toEqual(["Module", "Domain"]);
   });
 
   it("should bring inline code back in cells the renderer flattened", () => {
@@ -581,7 +581,7 @@ describe("TablePostProcessor source parsing", () => {
 
   it("should bring wikilinks back to life in cells the renderer flattened", () => {
     const text = [
-      "| Заметка | Проверено |",
+      "| Note | Checked |",
       "| --- | --- |",
       "| [[System Design]] | [x] |",
       "| [[Obsidian API|Obsidian]] | [ ] |",
@@ -590,7 +590,7 @@ describe("TablePostProcessor source parsing", () => {
     const { processor, ctx } = createProcessor({ text, lineStart: 0, lineEnd: 3 });
     // Obsidian renders the wikilinks as bare text inside the <td>.
     const wrapper = buildRenderedTable(
-      ["Заметка", "Проверено"],
+      ["Note", "Checked"],
       [["System Design", "[x]"], ["Obsidian", "[ ]"]]
     );
 
@@ -607,15 +607,15 @@ describe("TablePostProcessor source parsing", () => {
   });
 
   it("should keep the rendered text for cells whose Markdown it cannot draw", () => {
-    const text = ["| Заметка |", "| --- |", "| **важно** |"].join("\n");
+    const text = ["| Note |", "| --- |", "| **important** |"].join("\n");
 
     const { processor, ctx } = createProcessor({ text, lineStart: 0, lineEnd: 2 });
-    const wrapper = buildRenderedTable(["Заметка"], [["важно"]]);
+    const wrapper = buildRenderedTable(["Note"], [["important"]]);
 
     processor.process(wrapper, ctx);
 
     const cell = wrapper.querySelector<HTMLElement>('.ms-db-td[data-col-index="0"]');
-    expect(cell?.textContent).toBe("важно");
+    expect(cell?.textContent).toBe("important");
   });
 
   it("should isolate two inline tables with identical headers in separate rendered sections (#23)", async () => {
@@ -677,20 +677,20 @@ describe("TablePostProcessor source parsing", () => {
 
   it("should preserve relative markdown and escaped wikilink columns with commas as clickable text links", () => {
     const text = [
-      "| Шаг | Задача / полный prompt | Роль |",
+      "| Step | Task / full prompt | Role |",
       "| --- | --- | --- |",
-      "| 1 | [V2-ARCH-01 — Контракт MVP 2.0](prompts/arch.md) | Реализация |",
-      "| 2 | [CHAT02 — Сохраняемые сообщения, restart и корректный lifecycle](prompts/chat02.md) | Реализация |",
-      "| 3 | [[prompts/chat04\\|CHAT04 — Sidebar диалогов: восстановление, переименование, удаление и временный режим]] | Реализация |",
+      "| 1 | [SPEC-01 — Core contract v2.0](prompts/spec01.md) | Implementation |",
+      "| 2 | [TASK-02 — Persisted messages, restart and clean lifecycle](prompts/task02.md) | Implementation |",
+      "| 3 | [[prompts/task04\\|TASK-04 — History sidebar: restore, rename, delete and temporary mode]] | Implementation |",
     ].join("\n");
 
     const { processor, ctx } = createProcessor({ text, lineStart: 0, lineEnd: 4 });
     const wrapper = buildRenderedTable(
-      ["Шаг", "Задача / полный prompt", "Роль"],
+      ["Step", "Task / full prompt", "Role"],
       [
-        ["1", "V2-ARCH-01 — Контракт MVP 2.0", "Реализация"],
-        ["2", "CHAT02 — Сохраняемые сообщения, restart и корректный lifecycle", "Реализация"],
-        ["3", "CHAT04 — Sidebar диалогов: восстановление, переименование, удаление и временный режим", "Реализация"],
+        ["1", "SPEC-01 — Core contract v2.0", "Implementation"],
+        ["2", "TASK-02 — Persisted messages, restart and clean lifecycle", "Implementation"],
+        ["3", "TASK-04 — History sidebar: restore, rename, delete and temporary mode", "Implementation"],
       ]
     );
 
@@ -705,10 +705,10 @@ describe("TablePostProcessor source parsing", () => {
     );
     expect(links.length).toBe(3);
     expect(links[1].textContent).toBe(
-      "CHAT02 — Сохраняемые сообщения, restart и корректный lifecycle"
+      "TASK-02 — Persisted messages, restart and clean lifecycle"
     );
-    expect(links[1].dataset.href).toBe("prompts/chat02.md");
-    expect(links[2].dataset.href).toBe("prompts/chat04");
+    expect(links[1].dataset.href).toBe("prompts/task02.md");
+    expect(links[2].dataset.href).toBe("prompts/task04");
   });
 
 });

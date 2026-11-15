@@ -250,7 +250,7 @@ describe("Table State Manager", () => {
     const manager = new TableStateManager();
     const table: MarkdownTableData = {
       id: "tbl_calc",
-      headers: ["Задача", "Часы [number:sum]", "Срок [date:DD.MM.YYYY,count_not_empty]"],
+      headers: ["Task", "Hours [number:sum]", "Due [date:DD.MM.YYYY,count_not_empty]"],
       alignments: ["---", "---:", "---"],
       rows: [
         { rowIndex: 0, rawLine: "", cells: ["A", "12", "01.02.2026"] },
