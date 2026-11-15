@@ -22,10 +22,11 @@ describe("Tag Parser & Formatter", () => {
     });
 
     it("should parse wikilinks", () => {
-      const tags = parseCellTags("[[Project Alpha]], [[Team Beta|Alias]]");
-      expect(tags.length).toBe(2);
+      const tags = parseCellTags("[[Project Alpha]], [[Team Beta|Alias]], [[Escaped\\|Shown]]");
+      expect(tags.length).toBe(3);
       expect(tags[0].name).toBe("Project Alpha");
       expect(tags[1].name).toBe("Team Beta");
+      expect(tags[2].name).toBe("Escaped");
     });
 
     it("should parse hashtags including alphanumeric and underscores", () => {
@@ -101,6 +102,34 @@ describe("Tag Parser & Formatter", () => {
     it("should return false for regular single-value columns", () => {
       const values = ["Alice", "Bob", "Charlie", "David"];
       expect(looksLikeMultiSelect(values, "Author")).toBe(false);
+    });
+
+    it("should not misdetect single links or prose with commas as multi-select", () => {
+      expect(
+        looksLikeMultiSelect(
+          [
+            "[[prompts/CHAT02\\|CHAT02 — Сохраняемые сообщения, restart и корректный lifecycle]]",
+            "[CHAT04 — Sidebar диалогов: восстановление, переименование, удаление и временный режим](prompts/CHAT04.md)",
+            "[V2-OBS-01 — Безопасные logs, errors, panic и crash metadata](prompts/OBS01.md)",
+          ],
+          "Задача / полный prompt"
+        )
+      ).toBe(false);
+
+      expect(
+        looksLikeMultiSelect(
+          [
+            "CHAT02 — Сохраняемые сообщения, restart и корректный lifecycle",
+            "CHAT04 — Sidebar диалогов: восстановление, переименование, удаление и временный режим",
+            "V2-OBS-01 — Безопасные logs, errors, panic и crash metadata",
+          ],
+          "Задача / полный prompt"
+        )
+      ).toBe(false);
+
+      expect(looksLikeMultiSelect(["fn(a, b)", "map(x, y)", "plain"], "Expr")).toBe(false);
+      expect(looksLikeMultiSelect(["1,200", "3,450", "500"], "Budget")).toBe(false);
+      expect(looksLikeMultiSelect(["Fix #12", "Ref #34", "Done"], "Notes")).toBe(false);
     });
   });
 });

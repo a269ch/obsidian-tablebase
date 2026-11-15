@@ -110,7 +110,18 @@ export function stripCodeSpans(input: string): string {
 }
 
 const LINK_PATTERN =
-  /(\[(?<mdLabel>[^\]\r\n]+)\]\((?<mdUrl>https?:\/\/(?:[^\s()\r\n]|\([^\s()\r\n]*\))+)\))|(\[\[(?<wikiTarget>[^\]|\r\n]+)(?:\|(?<wikiAlias>[^\]\r\n]+))?\]\])|(?<rawUrl>https?:\/\/(?:[^\s<>[\]()"']|\([^\s<>[\]()"']*\))+)/g;
+  /(\[(?<mdLabel>[^\]\r\n]+)\]\((?<mdUrl><[^>\r\n]+>|(?:[^\s()\r\n]|\([^\s()\r\n]*\))+)\))|(\[\[(?<wikiTarget>[^\]|\r\n]+?)(?:\\?\|(?<wikiAlias>[^\]\r\n]+))?\]\])|(?<rawUrl>https?:\/\/(?:[^\s<>[\]()"']|\([^\s<>[\]()"']*\))+)/g;
+
+const URI_SCHEME_PATTERN = /^[a-zA-Z][a-zA-Z\d+.-]*:/;
+
+function decodeInternalLinkPath(path: string): string {
+  if (!path.includes("%")) return path;
+  try {
+    return decodeURIComponent(path);
+  } catch {
+    return path;
+  }
+}
 
 export function parseLinkTokens(input: string): LinkToken[] {
   if (!input) return [];
@@ -144,16 +155,23 @@ export function parseLinkTokens(input: string): LinkToken[] {
 function appendLinkToken(tokens: LinkToken[], match: RegExpExecArray): void {
   const groups = match.groups;
   if (groups?.mdUrl) {
+    const rawDest =
+      groups.mdUrl.startsWith("<") && groups.mdUrl.endsWith(">")
+        ? groups.mdUrl.slice(1, -1)
+        : groups.mdUrl;
+    const isExternal = URI_SCHEME_PATTERN.test(rawDest);
+    const label = groups.mdLabel ? stripCodeSpans(groups.mdLabel) : rawDest;
     tokens.push({
-      type: "external",
-      text: groups.mdLabel ? stripCodeSpans(groups.mdLabel) : groups.mdUrl,
-      href: groups.mdUrl,
+      type: isExternal ? "external" : "internal",
+      text: label,
+      href: isExternal ? rawDest : decodeInternalLinkPath(rawDest.trim()),
     });
   } else if (groups?.wikiTarget) {
+    const target = groups.wikiTarget.trim();
     tokens.push({
       type: "internal",
-      text: groups.wikiAlias || groups.wikiTarget,
-      href: groups.wikiTarget.trim(),
+      text: groups.wikiAlias || target,
+      href: target,
     });
   } else if (groups?.rawUrl) {
     const { url, trailing } = trimTrailingUrlPunctuation(groups.rawUrl);
