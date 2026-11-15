@@ -210,4 +210,23 @@ describe("link-renderer", () => {
     expect(container.querySelector("code")).toBeNull();
     expect(container.textContent).toBe("Run = this.file.name now");
   });
+
+  it("should parse relative markdown links as internal links and strip GFM escaped pipes in wikilinks", () => {
+    expect(parseLinkTokens("[CHAT02 — A, B](prompts/CHAT02.md)")).toEqual([
+      { type: "internal", text: "CHAT02 — A, B", href: "prompts/CHAT02.md" },
+    ]);
+    expect(parseLinkTokens("[Spaced](<folder/My Note.md#Top>)")).toEqual([
+      { type: "internal", text: "Spaced", href: "folder/My Note.md#Top" },
+    ]);
+    expect(parseLinkTokens("[Encoded](folder/My%20Note.md)")).toEqual([
+      { type: "internal", text: "Encoded", href: "folder/My Note.md" },
+    ]);
+    expect(parseLinkTokens("[Open](obsidian://open?vault=Demo)")).toEqual([
+      { type: "external", text: "Open", href: "obsidian://open?vault=Demo" },
+    ]);
+    expect(parseLinkTokens("[[prompts/CHAT02\\|CHAT02 — A, B]]")).toEqual([
+      { type: "internal", text: "CHAT02 — A, B", href: "prompts/CHAT02" },
+    ]);
+    expect(toPlainText("[CHAT02 — A, B](prompts/CHAT02.md)")).toBe("CHAT02 — A, B");
+  });
 });

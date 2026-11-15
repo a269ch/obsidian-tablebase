@@ -675,4 +675,40 @@ describe("TablePostProcessor source parsing", () => {
     expect(wrapper2.querySelector(".ms-db-grid-table")).not.toBeNull();
   });
 
+  it("should preserve relative markdown and escaped wikilink columns with commas as clickable text links", () => {
+    const text = [
+      "| Шаг | Задача / полный prompt | Роль |",
+      "| --- | --- | --- |",
+      "| 1 | [V2-ARCH-01 — Контракт MVP 2.0](prompts/arch.md) | Реализация |",
+      "| 2 | [CHAT02 — Сохраняемые сообщения, restart и корректный lifecycle](prompts/chat02.md) | Реализация |",
+      "| 3 | [[prompts/chat04\\|CHAT04 — Sidebar диалогов: восстановление, переименование, удаление и временный режим]] | Реализация |",
+    ].join("\n");
+
+    const { processor, ctx } = createProcessor({ text, lineStart: 0, lineEnd: 4 });
+    const wrapper = buildRenderedTable(
+      ["Шаг", "Задача / полный prompt", "Роль"],
+      [
+        ["1", "V2-ARCH-01 — Контракт MVP 2.0", "Реализация"],
+        ["2", "CHAT02 — Сохраняемые сообщения, restart и корректный lifecycle", "Реализация"],
+        ["3", "CHAT04 — Sidebar диалогов: восстановление, переименование, удаление и временный режим", "Реализация"],
+      ]
+    );
+
+    processor.process(wrapper, ctx);
+
+    const taskCells = wrapper.querySelectorAll<HTMLElement>('.ms-db-td[data-col-index="1"]');
+    expect(taskCells.length).toBe(3);
+    expect(wrapper.querySelectorAll('.ms-db-td[data-col-index="1"] .ms-tag-pill').length).toBe(0);
+
+    const links = wrapper.querySelectorAll<HTMLElement>(
+      '.ms-db-td[data-col-index="1"] .ms-cell-link.internal-link'
+    );
+    expect(links.length).toBe(3);
+    expect(links[1].textContent).toBe(
+      "CHAT02 — Сохраняемые сообщения, restart и корректный lifecycle"
+    );
+    expect(links[1].dataset.href).toBe("prompts/chat02.md");
+    expect(links[2].dataset.href).toBe("prompts/chat04");
+  });
+
 });
