@@ -111,6 +111,24 @@ export class NotionTableView implements Disposable, TableViewContext {
     this.render();
   }
 
+  public syncSettings(settings: PluginSettings): void {
+    this.options.settings = settings;
+  }
+
+  public rebindState(
+    tableData: MarkdownTableData,
+    columns: TableColumn[],
+    filterState: TableFilterState
+  ): void {
+    this.options.tableData = tableData;
+    this.options.columns = columns;
+    this.options.filterState = filterState;
+    filterState.viewType ??= "table";
+    filterState.hiddenColumnIndices ??= [];
+    this.selection.restore(filterState.selection);
+    this.render();
+  }
+
   public updateSettings(settings: PluginSettings): void {
     this.options.settings = settings;
     this.options.columns = this.options.columns.map((col) => {

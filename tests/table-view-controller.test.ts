@@ -332,4 +332,188 @@ describe("TableViewController", () => {
     expect(capturedTransform!(withSum)).not.toContain(":sum");
   });
 
+  it("should isolate column widths and sort rules between files with identical tables (#23 / #24 / #25.3)", async () => {
+    const raw = "| Task | Status |\n| --- | --- |\n| Alpha | Todo |\n| Beta | Done |";
+    const tableA = parseMarkdownTables(raw)[0];
+    const tableB = parseMarkdownTables(raw)[0];
+
+    const viewA = controller.createInlineTableView({
+      sourcePath: "notes/a.md",
+      tableData: tableA,
+      startLine: 0,
+      tableIndex: 0,
+    });
+    const viewB = controller.createInlineTableView({
+      sourcePath: "notes/b.md",
+      tableData: tableB,
+      startLine: 0,
+      tableIndex: 0,
+    });
+
+    expect(viewA.tableData.id).not.toBe(viewB.tableData.id);
+
+    await viewA.actions.onColumnResize?.({ 0: 260 });
+    viewA.actions.onSortChange([{ column: "Task", columnIndex: 0, direction: "desc" }]);
+    await new Promise((r) => setTimeout(r, 0));
+
+    const rebuiltA = controller.createInlineTableView({
+      sourcePath: "notes/a.md",
+      tableData: parseMarkdownTables(raw)[0],
+      startLine: 0,
+      tableIndex: 0,
+    });
+    const rebuiltB = controller.createInlineTableView({
+      sourcePath: "notes/b.md",
+      tableData: parseMarkdownTables(raw)[0],
+      startLine: 0,
+      tableIndex: 0,
+    });
+
+    expect(rebuiltA.columns[0].width).toBe(260);
+    expect(rebuiltA.filterState.sortRules).toEqual([
+      { column: "Task", columnIndex: 0, direction: "desc" },
+    ]);
+    expect(rebuiltB.columns[0].width).toBeUndefined();
+    expect(rebuiltB.filterState.sortRules).toEqual([]);
+  });
+
+  it("should persist tableSortRules across fresh TableStateManager and clear on unsort", async () => {
+    const raw = "| Task | Count |\n| --- | --- |\n| B | 2 |\n| A | 1 |";
+    const view = controller.createInlineTableView({
+      sourcePath: "notes/sort.md",
+      tableData: parseMarkdownTables(raw)[0],
+      startLine: 2,
+      tableIndex: 0,
+    });
+
+    view.actions.onSortChange([{ column: "Task", columnIndex: 0, direction: "asc" }]);
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(settingsService.getSettings().tableSortRules?.[view.tableData.id]).toEqual([
+      { column: "Task", columnIndex: 0, direction: "asc" },
+    ]);
+
+    // Simulate Obsidian restart: fresh TableStateManager, settings kept.
+    const freshController = new TableViewController(
+      app,
+      settingsService,
+      new TableStateManager(),
+      syncService
+    );
+    const restored = freshController.createInlineTableView({
+      sourcePath: "notes/sort.md",
+      tableData: parseMarkdownTables(`${raw}\n| C | 3 |`)[0],
+      startLine: 8,
+      tableIndex: 0,
+    });
+
+    expect(restored.tableData.id).toBe(view.tableData.id);
+    expect(restored.filterState.sortRules).toEqual([
+      { column: "Task", columnIndex: 0, direction: "asc" },
+    ]);
+
+    restored.actions.onSortChange([]);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(settingsService.getSettings().tableSortRules?.[view.tableData.id]).toBeUndefined();
+  });
+
+  it("should rebindTableId to the mounted occurrence and load its widths and sort rules", async () => {
+    const raw = "| Task | Status |\n| --- | --- |\n| Item | Todo |";
+    const { buildStableTableId } = await import("../src/core/table-id");
+    const firstId = buildStableTableId({
+      sourcePath: "notes/multi.md",
+      headers: ["Task", "Status"],
+      occurrence: 0,
+    });
+    const secondId = buildStableTableId({
+      sourcePath: "notes/multi.md",
+      headers: ["Task", "Status"],
+      occurrence: 1,
+    });
+
+    await settingsService.updateSettings({
+      tableColumnWidths: { [secondId]: { 1: 195 } },
+      tableSortRules: { [secondId]: [{ column: "Task", columnIndex: 0, direction: "desc" }] },
+    });
+
+    const view = controller.createCodeBlockView({
+      sourcePath: "notes/multi.md",
+      tableData: parseMarkdownTables(raw)[0],
+      initialSource: raw,
+    });
+    expect(view.tableData.id).toBe(firstId);
+    expect(view.columns[1].width).toBeUndefined();
+    expect(view.filterState.sortRules).toEqual([]);
+
+    controller.rebindTableId(view, secondId);
+
+    expect(view.tableData.id).toBe(secondId);
+    expect(view.columns[1].width).toBe(195);
+    expect(view.filterState.sortRules).toEqual([
+      { column: "Task", columnIndex: 0, direction: "desc" },
+    ]);
+  });
+
+  it("should migrate table widths, group orders, and sort rules when a column is renamed", async () => {
+    const raw = "| Task | Status |\n| --- | --- |\n| Alpha | Todo |\n| Beta | Done |";
+    vi.spyOn(syncService, "syncInlineTable").mockResolvedValue(undefined);
+
+    const view = controller.createInlineTableView({
+      sourcePath: "notes/rename.md",
+      tableData: parseMarkdownTables(raw)[0],
+      startLine: 0,
+      tableIndex: 0,
+    });
+    const oldId = view.tableData.id;
+
+    await view.actions.onColumnResize?.({ 1: 210 });
+    view.actions.onSortChange([{ column: "Task", columnIndex: 0, direction: "asc" }]);
+    await new Promise((r) => setTimeout(r, 0));
+
+    await view.actions.onRenameColumn(1, "Stage");
+    await new Promise((r) => setTimeout(r, 0));
+
+    const newId = view.tableData.id;
+    expect(newId).not.toBe(oldId);
+
+    const latest = settingsService.getSettings();
+    expect(latest.tableColumnWidths[oldId]).toBeUndefined();
+    expect(latest.tableColumnWidths[newId]).toEqual({ 1: 210 });
+    expect(latest.tableSortRules?.[oldId]).toBeUndefined();
+    expect(latest.tableSortRules?.[newId]).toEqual([
+      { column: "Task", columnIndex: 0, direction: "asc" },
+    ]);
+    expect(latest.tableBoardGroupOrders?.[oldId]).toBeUndefined();
+    expect(latest.tableBoardGroupOrders?.[newId]).toBeDefined();
+  });
+
+  it("should re-render sorted table when a checkbox cell is toggled", async () => {
+    const raw = "| Task | Done |\n| --- | --- |\n| First | [ ] |\n| Second | [ ] |";
+    vi.spyOn(syncService, "syncInlineTable").mockResolvedValue(undefined);
+
+    const view = controller.createInlineTableView({
+      sourcePath: "notes/checks.md",
+      tableData: parseMarkdownTables(raw)[0],
+      startLine: 0,
+      tableIndex: 0,
+    });
+
+    view.actions.onSortChange([{ column: "Done", columnIndex: 1, direction: "desc" }]);
+    const el = view.getElement();
+    document.body.appendChild(el);
+
+    const checkboxes = el.querySelectorAll<HTMLInputElement>("input[type='checkbox']");
+    expect(checkboxes).toHaveLength(2);
+    checkboxes[1].checked = true;
+    checkboxes[1].dispatchEvent(new Event("change", { bubbles: true }));
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    const renderedTitles = Array.from(
+      el.querySelectorAll<HTMLElement>('tbody tr td[data-col-index="0"]')
+    ).map((td) => td.textContent?.trim());
+    // "Second" was checked (`[x]`), so sorting Done desc puts it first.
+    expect(renderedTitles[0]).toBe("Second");
+  });
+
 });

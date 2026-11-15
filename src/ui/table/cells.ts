@@ -96,7 +96,10 @@ export class CellRenderer {
     checkbox.addEventListener("change", (e) => {
       this.focusCell(row.rowIndex, colIndex);
       const newValue = (e.target as HTMLInputElement).checked ? "[x]" : "[ ]";
-      void this.ctx.actions.onCellUpdate(row.rowIndex, colIndex, newValue);
+      void (async () => {
+        await this.ctx.actions.onCellUpdate(row.rowIndex, colIndex, newValue);
+        this.ctx.render();
+      })();
     });
 
     td.addEventListener("click", () => this.focusCell(row.rowIndex, colIndex));

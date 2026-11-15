@@ -170,6 +170,7 @@ export interface PluginSettings {
   showEmptyBoardProperties: boolean;
   tableColumnWidths: Record<string, Record<string, number>>;
   tableBoardGroupOrders: Record<string, Record<string, string[]>>;
+  tableSortRules?: Record<string, SortRule[]>;
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {

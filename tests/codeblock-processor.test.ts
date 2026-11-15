@@ -90,4 +90,51 @@ describe("TableCodeBlockProcessor", () => {
     expect(registry.size).toBe(0);
     expect(mockView.dispose).toHaveBeenCalled();
   });
+
+  it("should assign distinct occurrence IDs and call rebindTableId when section info resolves on mount", () => {
+    const docText = [
+      "```tablebase",
+      "| Col A | Col B |",
+      "| --- | --- |",
+      "| 1 | 2 |",
+      "```",
+      "",
+      "```tablebase",
+      "| Col A | Col B |",
+      "| --- | --- |",
+      "| 3 | 4 |",
+      "```",
+    ].join("\n");
+
+    const rebindSpy = vi.fn();
+    mockViewController.rebindTableId = rebindSpy;
+
+    const mockView = {
+      getElement: vi.fn(() => document.createElement("div")),
+      dispose: vi.fn(),
+    } as unknown as NotionTableView;
+    vi.mocked(mockViewController.createCodeBlockView).mockReturnValue(mockView);
+
+    const el = document.createElement("div");
+    let sectionReady = false;
+    const ctx = {
+      sourcePath: "folder/two-blocks.md",
+      addChild: vi.fn(),
+      getSectionInfo: () =>
+        sectionReady ? { lineStart: 6, lineEnd: 10, text: docText } : null,
+    } as unknown as MarkdownPostProcessorContext;
+
+    const source = "| Col A | Col B |\n| --- | --- |\n| 3 | 4 |";
+    processor.process(source, el, ctx);
+
+    expect(rebindSpy).not.toHaveBeenCalled();
+
+    sectionReady = true;
+    const renderChild = vi.mocked(ctx.addChild).mock.calls[0][0];
+    renderChild.onload();
+
+    expect(rebindSpy).toHaveBeenCalledTimes(1);
+    expect(rebindSpy.mock.calls[0][0]).toBe(mockView);
+    expect(rebindSpy.mock.calls[0][1]).toMatch(/^tbl:folder\/two-blocks\.md:[0-9a-f]{8}:1$/);
+  });
 });

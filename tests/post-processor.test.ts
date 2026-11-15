@@ -618,4 +618,61 @@ describe("TablePostProcessor source parsing", () => {
     expect(cell?.textContent).toBe("важно");
   });
 
+  it("should isolate two inline tables with identical headers in separate rendered sections (#23)", async () => {
+    const docText = [
+      "## First",
+      "",
+      "| Task | Status |",
+      "| --- | --- |",
+      "| Alpha | Todo |",
+      "",
+      "## Second",
+      "",
+      "| Task | Status |",
+      "| --- | --- |",
+      "| Beta | Done |",
+    ].join("\n");
+
+    const settingsService = new SettingsService({
+      loadData: async () => null,
+      saveData: async () => undefined,
+    });
+    const stateManager = new TableStateManager();
+    const app = { vault: {}, workspace: {} } as unknown as App;
+    const controller = new TableViewController(
+      app,
+      settingsService,
+      stateManager,
+      new TableSyncService(new VaultService(app))
+    );
+    const processor = new TablePostProcessor(controller, new TableViewRegistry(), settingsService);
+
+    const wrapper1 = buildRenderedTable(["Task", "Status"], [["Alpha", "Todo"]]);
+    const wrapper2 = buildRenderedTable(["Task", "Status"], [["Beta", "Done"]]);
+
+    const ctx1 = {
+      docId: "doc",
+      sourcePath: "Notes/Dual.md",
+      frontmatter: null,
+      addChild: vi.fn(),
+      getSectionInfo: () => ({ text: docText, lineStart: 2, lineEnd: 4 }),
+    } as unknown as MarkdownPostProcessorContext;
+    const ctx2 = {
+      docId: "doc",
+      sourcePath: "Notes/Dual.md",
+      frontmatter: null,
+      addChild: vi.fn(),
+      getSectionInfo: () => ({ text: docText, lineStart: 8, lineEnd: 10 }),
+    } as unknown as MarkdownPostProcessorContext;
+
+    processor.process(wrapper1, ctx1);
+    processor.process(wrapper2, ctx2);
+
+    // Switch table 1 to board view; table 2 must remain in table view.
+    wrapper1.querySelector<HTMLButtonElement>(".ms-db-view-tab-btn:not(.is-active)")?.click();
+    expect(wrapper1.querySelector(".ms-kanban-board-wrapper")).not.toBeNull();
+    expect(wrapper2.querySelector(".ms-kanban-board-wrapper")).toBeNull();
+    expect(wrapper2.querySelector(".ms-db-grid-table")).not.toBeNull();
+  });
+
 });
