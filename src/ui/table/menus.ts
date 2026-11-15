@@ -22,6 +22,7 @@ import {
   ICON_EYE_OFF,
   ICON_TRASH,
   ICON_TYPE_NUMBER,
+  ICON_VIEW_BOARD,
   ICON_WIDE_MODE,
 } from "../icons";
 import { confirmAction } from "../modals/confirm-modal";
@@ -188,6 +189,14 @@ export class TableMenus {
 
     this.addOptionToggleItem(menu, ICON_WIDE_MODE, "Wide mode", this.ctx.isWideMode(), () =>
       this.ctx.toggleWideMode()
+    );
+
+    this.addOptionToggleItem(
+      menu,
+      ICON_VIEW_BOARD,
+      "Board view",
+      this.ctx.isBoardViewVisible(),
+      () => this.ctx.toggleBoardView()
     );
 
     menu.createDiv({ cls: "ms-menu-divider" });

@@ -43,6 +43,7 @@ export interface TableViewActions {
   onTagColorChange(tagName: string, color: TagColor): Promise<void>;
   onColumnResize?(this: void, widths: Record<string, number>): Promise<void>;
   onWideModeChange?(this: void, isWide: boolean): Promise<void>;
+  onBoardViewChange?(this: void, isVisible: boolean): Promise<void>;
 }
 
 export type BoardViewActions = Pick<
@@ -74,6 +75,8 @@ export interface TableViewContext {
   isRowNumbersVisible(): boolean;
   isWideMode(): boolean;
   toggleWideMode(): void;
+  isBoardViewVisible(): boolean;
+  toggleBoardView(): void;
   getVisibleColumns(): TableColumn[];
   render(): void;
   renderRows(): void;

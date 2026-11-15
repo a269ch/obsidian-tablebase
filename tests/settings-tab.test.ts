@@ -253,4 +253,36 @@ describe("TableBaseSettingTab", () => {
     expect(mockUpdate).toHaveBeenCalledTimes(1);
     expect(tab.containerEl.querySelectorAll(".setting-item")).toHaveLength(0);
   });
+
+  it("should expose and update showBoardView in Appearance and declarative definitions (#25.1)", async () => {
+    const plugin = createMockPlugin();
+    const settingsService = new SettingsService(plugin);
+    await settingsService.loadSettings();
+
+    expect(settingsService.getSettings().showBoardView).toBe(true);
+
+    const tab = new TableBaseSettingTab({} as App, plugin, settingsService);
+    tab.display();
+
+    const boardSettingItem = Array.from(
+      tab.containerEl.querySelectorAll<HTMLElement>(".setting-item")
+    ).find(
+      (item) => item.querySelector(".setting-item-name")?.textContent?.trim() === "Show Board view"
+    );
+    expect(boardSettingItem).toBeDefined();
+
+    const toggle = boardSettingItem?.querySelector<HTMLElement>(".checkbox-container");
+    expect(toggle).not.toBeNull();
+    toggle?.click();
+    expect(settingsService.getSettings().showBoardView).toBe(false);
+
+    const defs = tab.getSettingDefinitions();
+    const boardDef = defs.find(
+      (item) => "control" in item && item.control && "key" in item.control && item.control.key === "showBoardView"
+    );
+    expect(boardDef).toBeDefined();
+    expect(tab.getControlValue("showBoardView")).toBe(false);
+    await tab.setControlValue("showBoardView", true);
+    expect(settingsService.getSettings().showBoardView).toBe(true);
+  });
 });

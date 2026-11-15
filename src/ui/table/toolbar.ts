@@ -37,7 +37,9 @@ export class TableToolbar {
   public render(container: HTMLElement): void {
     const topBar = container.createDiv({ cls: "ms-db-top-bar" });
 
-    this.renderViewTabs(topBar.createDiv({ cls: "ms-db-header-left" }));
+    if (this.ctx.isBoardViewVisible()) {
+      this.renderViewTabs(topBar.createDiv({ cls: "ms-db-header-left" }));
+    }
     this.renderActions(topBar.createDiv({ cls: "ms-db-header-right" }));
   }
 
