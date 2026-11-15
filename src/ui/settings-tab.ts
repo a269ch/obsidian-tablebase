@@ -1,4 +1,4 @@
-import { App, Plugin, PluginSettingTab, Setting, SettingDefinitionItem } from "obsidian";
+import { App, Plugin, PluginSettingTab, Setting, SettingDefinitionItem, SettingPage } from "obsidian";
 import { DATE_FORMAT_OPTIONS } from "../core/date-utils";
 import { SettingsService } from "../services/settings-service";
 import { DateFormatOption, TagColor, TagFormat } from "../types";
@@ -84,15 +84,21 @@ export class TableBaseSettingTab extends PluginSettingTab {
         },
       },
       {
+        type: "page",
         name: "Custom tag colors",
         desc: "Customize colors for specific tags. These override automatic colors across all tables and boards.",
+        displayValue: () => {
+          const count = Object.keys(this.settingsService.getSettings().customTagColors ?? {}).length;
+          return count === 0 ? "None configured" : `${count} configured`;
+        },
+        page: () => this.createCustomTagColorsPage(),
       },
       {
         name: "Restore default settings",
         desc: "Reset all plugin settings back to default values.",
         action: () => {
           void this.settingsService.resetDefaults().then(() => {
-            this.refresh();
+            this.refreshTab();
           });
         },
       },
@@ -124,13 +130,18 @@ export class TableBaseSettingTab extends PluginSettingTab {
   }
 
   override display(): void {
-    this.refresh();
+    this.renderLegacyDisplay();
   }
 
-  private refresh(): void {
+  private refreshTab(): void {
     if ("update" in this && typeof (this as unknown as { update?: () => void }).update === "function") {
       (this as unknown as { update: () => void }).update();
+      return;
     }
+    this.renderLegacyDisplay();
+  }
+
+  private renderLegacyDisplay(): void {
     const { containerEl } = this;
     containerEl.empty();
 
@@ -139,6 +150,26 @@ export class TableBaseSettingTab extends PluginSettingTab {
     this.renderAppearance(containerEl);
     this.renderCustomTagColors(containerEl);
     this.renderReset(containerEl);
+  }
+
+  private createCustomTagColorsPage(): SettingPage {
+    const BasePage = SettingPage;
+    const tab = this;
+
+    // Subclass dynamically so loading on Obsidian < 1.13 does not evaluate SettingPage.
+    class CustomTagColorsPage extends BasePage {
+      override title = "Custom tag colors";
+
+      override display(): void {
+        this.containerEl.empty();
+        tab.renderCustomTagColorsContent(this.containerEl, () => {
+          this.display();
+          tab.refreshTab();
+        });
+      }
+    }
+
+    return new CustomTagColorsPage();
   }
 
   private addHeading(containerEl: HTMLElement, title: string): void {
@@ -259,8 +290,12 @@ export class TableBaseSettingTab extends PluginSettingTab {
   }
 
   private renderCustomTagColors(containerEl: HTMLElement): void {
-    const settings = this.settingsService.getSettings();
     this.addHeading(containerEl, "Custom tag colors");
+    this.renderCustomTagColorsContent(containerEl, () => this.refreshTab());
+  }
+
+  private renderCustomTagColorsContent(containerEl: HTMLElement, onChanged: () => void): void {
+    const settings = this.settingsService.getSettings();
 
     containerEl.createEl("p", {
       cls: "setting-item-description",
@@ -278,17 +313,18 @@ export class TableBaseSettingTab extends PluginSettingTab {
       });
     } else {
       for (const [tagKey, colorValue] of tagEntries) {
-        this.renderTagColorRow(colorsContainer, tagKey, colorValue);
+        this.renderTagColorRow(colorsContainer, tagKey, colorValue, onChanged);
       }
     }
 
-    this.renderAddTagColor(containerEl);
+    this.renderAddTagColor(containerEl, onChanged);
   }
 
   private renderTagColorRow(
     container: HTMLElement,
     tagKey: string,
-    colorValue: TagColor
+    colorValue: TagColor,
+    onChanged: () => void
   ): void {
     const setting = new Setting(container);
 
@@ -304,7 +340,7 @@ export class TableBaseSettingTab extends PluginSettingTab {
         currentColor: colorValue,
         onSelectColor: async (newColor) => {
           await this.settingsService.setTagColor(tagKey, newColor);
-          this.refresh();
+          onChanged();
         },
       })
     );
@@ -315,12 +351,12 @@ export class TableBaseSettingTab extends PluginSettingTab {
         .setTooltip("Reset to automatic color")
         .onClick(async () => {
           await this.settingsService.removeTagColor(tagKey);
-          this.refresh();
+          onChanged();
         })
     );
   }
 
-  private renderAddTagColor(containerEl: HTMLElement): void {
+  private renderAddTagColor(containerEl: HTMLElement, onChanged: () => void): void {
     let newTagName = "";
     let newTagColor: TagColor = "blue";
 
@@ -350,7 +386,7 @@ export class TableBaseSettingTab extends PluginSettingTab {
           const trimmed = newTagName.trim();
           if (!trimmed) return;
           await this.settingsService.setTagColor(trimmed, newTagColor);
-          this.refresh();
+          onChanged();
         })
     );
   }
@@ -371,7 +407,7 @@ export class TableBaseSettingTab extends PluginSettingTab {
         }
         btn.onClick(async () => {
           await this.settingsService.resetDefaults();
-          this.refresh();
+          this.refreshTab();
         });
       });
   }

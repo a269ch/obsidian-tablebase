@@ -185,4 +185,72 @@ describe("TableBaseSettingTab", () => {
     expect(settingsService.getSettings().showRowNumbers).toBe(false);
     expect(settingsService.getSettings().defaultTagFormat).toBe("comma");
   });
+
+  it("should expose Custom tag colors as an interactive SettingPage definition for Obsidian 1.13+ (#25.4)", async () => {
+    const plugin = createMockPlugin();
+    const settingsService = new SettingsService(plugin);
+    await settingsService.loadSettings();
+
+    const tab = new TableBaseSettingTab({} as App, plugin, settingsService);
+    const mockUpdate = vi.fn();
+    (tab as unknown as { update: () => void }).update = mockUpdate;
+
+    const defs = tab.getSettingDefinitions();
+    const customColorsDef = defs.find(
+      (item): item is Extract<(typeof defs)[number], { type: "page" }> =>
+        "type" in item && item.type === "page" && item.name === "Custom tag colors"
+    );
+
+    expect(customColorsDef).toBeDefined();
+    expect(typeof customColorsDef?.page).toBe("function");
+    expect(
+      typeof (typeof customColorsDef?.displayValue === "function"
+        ? customColorsDef.displayValue()
+        : customColorsDef?.displayValue)
+    ).toBe("string");
+
+    const page = customColorsDef!.page!();
+    page.display();
+    expect(page.title).toBe("Custom tag colors");
+
+    const input = page.containerEl.querySelector<HTMLInputElement>("input[type='text']");
+    expect(input).not.toBeNull();
+    if (input) {
+      input.value = "Blocked";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+
+    const addBtn = Array.from(page.containerEl.querySelectorAll<HTMLButtonElement>("button")).find(
+      (b) => b.textContent === "Add"
+    );
+    expect(addBtn).toBeDefined();
+    addBtn?.click();
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(settingsService.getSettings().customTagColors["blocked"]).toBeDefined();
+    expect(mockUpdate).toHaveBeenCalled();
+    expect(tab.containerEl.querySelectorAll(".setting-item")).toHaveLength(0);
+
+    const trashBtn = page.containerEl.querySelector<HTMLElement>(
+      ".setting-item [data-icon='trash']"
+    );
+    expect(trashBtn).not.toBeNull();
+    trashBtn?.click();
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(settingsService.getSettings().customTagColors["blocked"]).toBeUndefined();
+
+    // Reset action should call update() without clobbering declarative DOM via legacy display.
+    mockUpdate.mockClear();
+    const resetDef = defs.find(
+      (item): item is (typeof defs)[number] & { action: () => void } =>
+        "action" in item && typeof item.action === "function"
+    );
+    expect(resetDef).toBeDefined();
+    resetDef?.action();
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+    expect(tab.containerEl.querySelectorAll(".setting-item")).toHaveLength(0);
+  });
 });
