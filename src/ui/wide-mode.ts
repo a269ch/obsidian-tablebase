@@ -4,10 +4,23 @@ import { ICON_NARROW_MODE, ICON_WIDE_MODE } from "./icons";
 
 const WIDE_MODE_PAGE_SELECTOR =
   ".callout-content, .markdown-embed-content, .markdown-preview-view, .cm-scroller, .view-content";
+const WIDE_MODE_HOST_ANCESTOR_SELECTOR =
+  ".el-table, .table-wrapper, .el-pre, .cm-embed-block, .cm-preview-code-block";
 const WIDE_MODE_HOST_CLASS = "ms-wide-mode-host";
 const WIDE_MODE_CLASS = "is-wide-mode";
 const MIN_LEFT_GUTTER_PX = 28;
 const MIN_RIGHT_GUTTER_PX = 20;
+
+function isResizeObserverCtor(value: unknown): value is typeof ResizeObserver {
+  return typeof value === "function";
+}
+
+function getResizeObserver(win: Window | null): typeof ResizeObserver | null {
+  if (win && "ResizeObserver" in win && isResizeObserverCtor(win.ResizeObserver)) {
+    return win.ResizeObserver;
+  }
+  return typeof ResizeObserver !== "undefined" ? ResizeObserver : null;
+}
 
 export function createWideModeToggleButton(
   parent: HTMLElement,
@@ -40,7 +53,7 @@ export function createWideModeToggleButton(
 export class WideModeController implements Disposable {
   private readonly containerEl: HTMLElement;
   private readonly layoutRegistry = new DisposableRegistry();
-  private lastHostEl: HTMLElement | null = null;
+  private hostEls: HTMLElement[] = [];
   private lastWidthProp = "";
   private lastOffsetProp = "";
 
@@ -85,6 +98,7 @@ export class WideModeController implements Disposable {
 
   public dispose(): void {
     this.layoutRegistry.disposeAll();
+    this.containerEl.classList.remove(WIDE_MODE_CLASS);
     this.clearHostClass();
     this.clearCustomProperties();
   }
@@ -93,23 +107,49 @@ export class WideModeController implements Disposable {
     return this.containerEl.ownerDocument?.defaultView ?? (typeof window !== "undefined" ? window : null);
   }
 
-  private syncHostClass(): void {
-    const hostEl = this.containerEl.parentElement;
-    if (this.lastHostEl && this.lastHostEl !== hostEl) {
-      this.lastHostEl.classList.remove(WIDE_MODE_HOST_CLASS);
+  private collectHostElements(): HTMLElement[] {
+    const hosts: HTMLElement[] = [];
+    const parentEl = this.containerEl.parentElement;
+    if (!parentEl) return hosts;
+
+    hosts.push(parentEl);
+    let current = parentEl.parentElement;
+    while (current && !current.matches(WIDE_MODE_PAGE_SELECTOR)) {
+      if (current.matches(WIDE_MODE_HOST_ANCESTOR_SELECTOR)) {
+        hosts.push(current);
+      }
+      current = current.parentElement;
     }
-    if (hostEl) {
-      hostEl.classList.add(WIDE_MODE_HOST_CLASS);
-      this.lastHostEl = hostEl;
-    } else {
-      this.lastHostEl = null;
+    return hosts;
+  }
+
+  private removeHostClassIfUnused(el: HTMLElement): void {
+    if (!el.querySelector(`.${WIDE_MODE_CLASS}`)) {
+      el.classList.remove(WIDE_MODE_HOST_CLASS);
     }
   }
 
+  private syncHostClass(): void {
+    const nextHosts = this.collectHostElements();
+    for (const prevHost of this.hostEls) {
+      if (!nextHosts.includes(prevHost)) {
+        this.removeHostClassIfUnused(prevHost);
+      }
+    }
+    for (const host of nextHosts) {
+      host.classList.add(WIDE_MODE_HOST_CLASS);
+    }
+    this.hostEls = nextHosts;
+  }
+
   private clearHostClass(): void {
-    this.containerEl.parentElement?.classList.remove(WIDE_MODE_HOST_CLASS);
-    this.lastHostEl?.classList.remove(WIDE_MODE_HOST_CLASS);
-    this.lastHostEl = null;
+    if (this.containerEl.parentElement) {
+      this.removeHostClassIfUnused(this.containerEl.parentElement);
+    }
+    for (const host of this.hostEls) {
+      this.removeHostClassIfUnused(host);
+    }
+    this.hostEls = [];
   }
 
   private clearCustomProperties(): void {
@@ -129,10 +169,7 @@ export class WideModeController implements Disposable {
 
     const hostEl = this.containerEl.parentElement;
     const pageEl = this.containerEl.closest<HTMLElement>(WIDE_MODE_PAGE_SELECTOR);
-    const win = this.getWindow() as (Window & { ResizeObserver?: typeof ResizeObserver }) | null;
-    const ObserverCtor =
-      win?.ResizeObserver ??
-      (typeof ResizeObserver !== "undefined" ? ResizeObserver : null);
+    const ObserverCtor = getResizeObserver(this.getWindow());
 
     if (!ObserverCtor || (!hostEl && !pageEl)) return;
 

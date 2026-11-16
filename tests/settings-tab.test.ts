@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
+import * as obsidian from "obsidian";
 import { App, Plugin } from "obsidian";
 import { SettingsService } from "../src/services/settings-service";
 import { TableBaseSettingTab } from "../src/ui/settings-tab";
@@ -284,5 +285,25 @@ describe("TableBaseSettingTab", () => {
     expect(tab.getControlValue("showBoardView")).toBe(false);
     await tab.setControlValue("showBoardView", true);
     expect(settingsService.getSettings().showBoardView).toBe(true);
+  });
+
+  it("should guard Custom tag colors SettingPage creation behind requireApiVersion 1.13.0", async () => {
+    const plugin = createMockPlugin();
+    const settingsService = new SettingsService(plugin);
+    await settingsService.loadSettings();
+
+    const spy = vi.spyOn(obsidian, "requireApiVersion").mockReturnValue(false);
+    try {
+      const tab = new TableBaseSettingTab({} as App, plugin, settingsService);
+      const defs = tab.getSettingDefinitions();
+      const customColorsDef = defs.find(
+        (item): item is Extract<(typeof defs)[number], { type: "page" }> =>
+          "type" in item && item.type === "page" && item.name === "Custom tag colors"
+      );
+      expect(customColorsDef).toBeDefined();
+      expect(() => customColorsDef!.page!()).toThrow("1.13.0");
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
