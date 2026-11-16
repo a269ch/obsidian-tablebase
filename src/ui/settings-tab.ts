@@ -1,4 +1,4 @@
-import { App, Plugin, PluginSettingTab, Setting, SettingDefinitionItem, SettingPage } from "obsidian";
+import { App, Plugin, PluginSettingTab, Setting, SettingDefinitionItem, SettingPage, requireApiVersion } from "obsidian";
 import { DATE_FORMAT_OPTIONS } from "../core/date-utils";
 import { SettingsService } from "../services/settings-service";
 import { DateFormatOption, TagColor, TagFormat } from "../types";
@@ -161,18 +161,27 @@ export class TableBaseSettingTab extends PluginSettingTab {
   }
 
   private createCustomTagColorsPage(): SettingPage {
-    const BasePage = SettingPage;
-    const tab = this;
+    if (!requireApiVersion("1.13.0")) {
+      throw new Error("Custom tag colors page requires Obsidian 1.13.0 or newer");
+    }
 
-    // Subclass dynamically so loading on Obsidian < 1.13 does not evaluate SettingPage.
-    class CustomTagColorsPage extends BasePage {
+    const renderContent = (containerEl: HTMLElement, onChanged: () => void): void => {
+      this.renderCustomTagColorsContent(containerEl, onChanged);
+    };
+    const refresh = (): void => {
+      this.refreshTab();
+    };
+
+    // Subclass dynamically inside the version check so loading on Obsidian < 1.13 never evaluates SettingPage.
+    class CustomTagColorsPage extends SettingPage {
       override title = "Custom tag colors";
 
       override display(): void {
+        if (!requireApiVersion("1.13.0")) return;
         this.containerEl.empty();
-        tab.renderCustomTagColorsContent(this.containerEl, () => {
+        renderContent(this.containerEl, () => {
           this.display();
-          tab.refreshTab();
+          refresh();
         });
       }
     }

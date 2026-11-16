@@ -381,4 +381,66 @@ describe("Wide mode toggle and layout", () => {
     expect(containerEl.style.getPropertyValue("--ms-wide-offset-left")).toBe("");
     controller.dispose();
   });
+
+  it("should mark enclosing block wrappers as wide-mode hosts without CSS :has and clean them up safely", () => {
+    const pane = document.createElement("div");
+    pane.className = "cm-scroller";
+    Object.defineProperty(pane, "clientWidth", { configurable: true, value: 1200 });
+    mockElementRect(pane, { left: 0, width: 1200 });
+
+    const previewBlock = document.createElement("div");
+    previewBlock.className = "cm-preview-code-block";
+    const embedBlock = document.createElement("div");
+    embedBlock.className = "cm-embed-block";
+    const preEl = document.createElement("div");
+    preEl.className = "el-pre";
+    const innerHostA = document.createElement("div");
+    innerHostA.className = "block-language-tablebase";
+    const innerHostB = document.createElement("div");
+    innerHostB.className = "block-language-tablebase";
+
+    mockElementRect(innerHostA, { left: 200, width: 700 });
+    mockElementRect(innerHostB, { left: 200, width: 700 });
+
+    const containerA = document.createElement("div");
+    containerA.className = "ms-notion-database-container";
+    const containerB = document.createElement("div");
+    containerB.className = "ms-notion-database-container";
+
+    innerHostA.appendChild(containerA);
+    innerHostB.appendChild(containerB);
+    preEl.append(innerHostA, innerHostB);
+    embedBlock.appendChild(preEl);
+    previewBlock.appendChild(embedBlock);
+    pane.appendChild(previewBlock);
+    document.body.appendChild(pane);
+
+    const ctrlA = new WideModeController(containerA);
+    const ctrlB = new WideModeController(containerB);
+    ctrlA.sync(true);
+    ctrlB.sync(true);
+
+    expect(pane.classList.contains("ms-wide-mode-host")).toBe(false);
+    expect(previewBlock.classList.contains("ms-wide-mode-host")).toBe(true);
+    expect(embedBlock.classList.contains("ms-wide-mode-host")).toBe(true);
+    expect(preEl.classList.contains("ms-wide-mode-host")).toBe(true);
+    expect(innerHostA.classList.contains("ms-wide-mode-host")).toBe(true);
+    expect(innerHostB.classList.contains("ms-wide-mode-host")).toBe(true);
+
+    // Turning off one container clears its immediate wrapper while keeping shared wide ancestors.
+    ctrlA.sync(false);
+    expect(innerHostA.classList.contains("ms-wide-mode-host")).toBe(false);
+    expect(preEl.classList.contains("ms-wide-mode-host")).toBe(true);
+    expect(embedBlock.classList.contains("ms-wide-mode-host")).toBe(true);
+    expect(previewBlock.classList.contains("ms-wide-mode-host")).toBe(true);
+
+    // Disposing the last active wide container removes host classes from all remaining ancestors.
+    ctrlB.dispose();
+    expect(innerHostB.classList.contains("ms-wide-mode-host")).toBe(false);
+    expect(preEl.classList.contains("ms-wide-mode-host")).toBe(false);
+    expect(embedBlock.classList.contains("ms-wide-mode-host")).toBe(false);
+    expect(previewBlock.classList.contains("ms-wide-mode-host")).toBe(false);
+
+    ctrlA.dispose();
+  });
 });

@@ -160,11 +160,10 @@
 .ms-wide-mode-host,
 .el-table.ms-wide-mode-host,
 .table-wrapper.ms-wide-mode-host,
-.markdown-rendered .ms-wide-mode-host,
-.el-table:has(> .ms-notion-database-container.is-wide-mode),
-.el-pre:has(.ms-notion-database-container.is-wide-mode),
-.cm-embed-block:has(.ms-notion-database-container.is-wide-mode),
-.cm-preview-code-block:has(.ms-notion-database-container.is-wide-mode) {
+.el-pre.ms-wide-mode-host,
+.cm-embed-block.ms-wide-mode-host,
+.cm-preview-code-block.ms-wide-mode-host,
+.markdown-rendered .ms-wide-mode-host {
   overflow: visible;
 }
 

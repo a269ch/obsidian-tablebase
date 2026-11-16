@@ -216,7 +216,7 @@ export function renderTextWithLinks(
     } else if (token.type === "code") {
       // A span, not `code`: plugins that act on inline code (queries, inputs)
       // must not run on cell text.
-      container.createEl("span", { cls: "ms-cell-code", text: token.text });
+      container.createSpan({ cls: "ms-cell-code", text: token.text });
     } else if (token.type === "external") {
       const linkEl = container.createEl("a", {
         cls: "ms-cell-link external-link",
