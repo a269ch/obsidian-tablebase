@@ -5,6 +5,14 @@ import { DateFormatOption, TagColor, TagFormat } from "../types";
 import { createColorPickerElement } from "./color-picker";
 import { createTagBadge } from "./tag-badge";
 
+interface RuntimeSettingPage {
+  containerEl: HTMLElement;
+  title: string;
+  display(): void;
+}
+
+type RuntimeSettingPageConstructor = new () => RuntimeSettingPage;
+
 export class TableBaseSettingTab extends PluginSettingTab {
   private settingsService: SettingsService;
 
@@ -161,10 +169,6 @@ export class TableBaseSettingTab extends PluginSettingTab {
   }
 
   private createCustomTagColorsPage(): SettingPage {
-    if (!requireApiVersion("1.13.0")) {
-      throw new Error("Custom tag colors page requires Obsidian 1.13.0 or newer");
-    }
-
     const renderContent = (containerEl: HTMLElement, onChanged: () => void): void => {
       this.renderCustomTagColorsContent(containerEl, onChanged);
     };
@@ -172,21 +176,26 @@ export class TableBaseSettingTab extends PluginSettingTab {
       this.refreshTab();
     };
 
-    // Subclass dynamically inside the version check so loading on Obsidian < 1.13 never evaluates SettingPage.
-    class CustomTagColorsPage extends SettingPage {
-      override title = "Custom tag colors";
+    if (requireApiVersion("1.13.0")) {
+      const BasePage = SettingPage as unknown as RuntimeSettingPageConstructor;
 
-      override display(): void {
-        if (!requireApiVersion("1.13.0")) return;
-        this.containerEl.empty();
-        renderContent(this.containerEl, () => {
-          this.display();
-          refresh();
-        });
+      // Subclass dynamically inside the API guard so loading on Obsidian < 1.13 never evaluates SettingPage.
+      class CustomTagColorsPage extends BasePage {
+        override title = "Custom tag colors";
+
+        override display(): void {
+          this.containerEl.empty();
+          renderContent(this.containerEl, () => {
+            this.display();
+            refresh();
+          });
+        }
       }
+
+      return new CustomTagColorsPage() as unknown as SettingPage;
     }
 
-    return new CustomTagColorsPage();
+    throw new Error("Custom tag colors page requires Obsidian 1.13.0 or newer");
   }
 
   private addHeading(containerEl: HTMLElement, title: string): void {
