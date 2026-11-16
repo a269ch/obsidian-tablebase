@@ -398,3 +398,24 @@ export class Modal {
   onOpen(): void {}
   onClose(): void {}
 }
+
+export abstract class SettingPage {
+  rootEl: HTMLElement;
+  titlebarEl: HTMLElement;
+  containerEl: HTMLElement;
+  title = "";
+
+  constructor() {
+    this.rootEl = document.createElement("div");
+    this.titlebarEl = document.createElement("div");
+    this.containerEl = document.createElement("div");
+  }
+
+  abstract display(): void;
+
+  hide(): void {}
+}
+
+export function requireApiVersion(_version: string): boolean {
+  return true;
+}

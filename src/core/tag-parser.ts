@@ -1,4 +1,5 @@
 import { TagColor, MultiSelectTag, TagFormat } from "../types";
+import { parseLinkTokens } from "../utils/link-renderer";
 import { resolveTagColor } from "./color-palette";
 
 export function parseCellTags(
@@ -20,8 +21,9 @@ export function parseCellTags(
     const wikilinkRegex = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g;
     let match: RegExpExecArray | null;
     while ((match = wikilinkRegex.exec(trimmed)) !== null) {
-      if (match[1] && match[1].trim()) {
-        rawTags.push(match[1].trim());
+      const target = match[1]?.replace(/\\$/, "").trim();
+      if (target) {
+        rawTags.push(target);
       }
     }
   }
@@ -94,6 +96,74 @@ export function formatTagsToCell(
   }
 }
 
+const MAX_AUTO_TAG_LENGTH = 28;
+const MAX_AUTO_TAG_WORDS = 3;
+const HASHTAG_TOKEN_REGEX = /(?:^|\s)#(?=[\p{L}\p{N}_-]*\p{L})[\p{L}\p{N}_-]+/u;
+const PROSE_PUNCTUATION_REGEX = /[.!?…:]|\s[—–-]\s/;
+const CONJUNCTION_PREFIX_REGEX = /^(?:and|or|but|и|или|но|а)\s+/i;
+const NUMERIC_THOUSANDS_REGEX = /^[+-]?\$?\d{1,3}(?:,\d{3})+(?:\.\d+)?%?$/;
+
+function hasBalancedParens(text: string): boolean {
+  let depth = 0;
+  for (const ch of text) {
+    if (ch === "(") depth++;
+    else if (ch === ")") {
+      depth--;
+      if (depth < 0) return false;
+    }
+  }
+  return depth === 0;
+}
+
+function isConciseTagPart(part: string): boolean {
+  if (!part || part.length > MAX_AUTO_TAG_LENGTH) return false;
+  if (part.split(/\s+/).length > MAX_AUTO_TAG_WORDS) return false;
+  if (PROSE_PUNCTUATION_REGEX.test(part)) return false;
+  if (CONJUNCTION_PREFIX_REGEX.test(part)) return false;
+  if (!hasBalancedParens(part)) return false;
+  return true;
+}
+
+function isLikelyMultiSelectCell(rawValue: string): boolean {
+  const trimmed = rawValue.trim();
+  if (!trimmed || trimmed === "-" || trimmed === "N/A" || trimmed === "null") {
+    return false;
+  }
+
+  const tokens = parseLinkTokens(trimmed);
+  const linkCount = tokens.filter(
+    (token) => token.type === "internal" || token.type === "external"
+  ).length;
+  if (linkCount > 1) {
+    return true;
+  }
+
+  const plainText = tokens
+    .filter((token) => token.type === "text")
+    .map((token) => token.text)
+    .join(" ")
+    .trim();
+
+  if (plainText && HASHTAG_TOKEN_REGEX.test(plainText)) {
+    return true;
+  }
+
+  // Commas or punctuation inside a single link alias/label do not denote tags.
+  if (linkCount === 1 || !plainText || NUMERIC_THOUSANDS_REGEX.test(plainText)) {
+    return false;
+  }
+
+  const parts = plainText
+    .split(/[,;]/)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  if (parts.length < 2) {
+    return false;
+  }
+
+  return parts.some((part) => /\p{L}/u.test(part)) && parts.every(isConciseTagPart);
+}
+
 export function looksLikeMultiSelect(
   values: string[],
   columnHeaderName?: string
@@ -115,10 +185,7 @@ export function looksLikeMultiSelect(
   for (const val of values) {
     if (!val || val.trim() === "") continue;
     totalNonEmpty++;
-    const tags = parseCellTags(val);
-    // A lone "[[Page]]" is a link to one note, not a list of tags; cells that
-    // really hold several of them are caught by the tag count above.
-    if (tags.length > 1 || val.includes(",") || val.startsWith("#")) {
+    if (isLikelyMultiSelectCell(val)) {
       multiCount++;
     }
   }

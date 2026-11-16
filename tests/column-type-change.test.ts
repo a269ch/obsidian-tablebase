@@ -114,10 +114,10 @@ describe("changing a column type from the header menu", () => {
     doc = [
       "# Note",
       "",
-      "| Модуль | Категория |",
+      "| Module | Domain |",
       "| --- | --- |",
-      "| Ядро | Architecture, Core |",
-      "| Интерфейс | Web, UI, Design |",
+      "| Core | Architecture, Core |",
+      "| Interface | Web, UI, Design |",
       "",
     ].join("\n");
 
@@ -145,7 +145,7 @@ describe("changing a column type from the header menu", () => {
     await flush();
 
     // Without the annotation the column would detect itself as tags again.
-    expect(doc).toContain("Категория [text]");
+    expect(doc).toContain("Domain [text]");
     expect(doc).toContain("# Note");
 
     document.body.innerHTML = "";
@@ -157,7 +157,7 @@ describe("changing a column type from the header menu", () => {
     expect(cell?.querySelector(".ms-tag-badge")).toBeNull();
     expect(
       Array.from(rerendered.querySelectorAll(".ms-db-col-name")).map((el) => el.textContent)
-    ).toEqual(["Модуль", "Категория"]);
+    ).toEqual(["Module", "Domain"]);
   });
 
   it("turns a select column of a table code block into text", async () => {

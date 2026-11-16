@@ -27,13 +27,22 @@ import {
   applyReorderColumns,
   applyReorderRows,
 } from "../core/table-mutator";
+import {
+  buildStableTableId,
+  isStableTableId,
+  normalizeTableHeaderSignature,
+  parseOccurrenceFromTableId,
+} from "../core/table-id";
 import { TableStateManager } from "../core/table-state";
 import {
   CalculationType,
   ColumnAlignment,
   MarkdownTableData,
   MarkdownTableRow,
+  PluginSettings,
   SortRule,
+  TableColumn,
+  TableFilterState,
 } from "../types";
 import { NotionTableView } from "../ui/table/table-view";
 import { TableViewActions } from "../ui/table/types";
@@ -84,6 +93,7 @@ export class TableViewController {
   private syncService: TableSyncService;
   private editorScroll: Map<string, { top: number; left: number }> = new Map();
   private editorScrollObservers: Map<string, MutationObserver> = new Map();
+  private rebindHandlers = new WeakMap<NotionTableView, (newTableId: string) => void>();
 
   constructor(
     app: App,
@@ -99,6 +109,13 @@ export class TableViewController {
 
   public createCodeBlockView(params: CodeBlockViewParams): NotionTableView {
     const { sourcePath, tableData } = params;
+    if (!isStableTableId(tableData.id)) {
+      tableData.id = buildStableTableId({
+        sourcePath,
+        headers: tableData.headers,
+        occurrence: 0,
+      });
+    }
     let currentSource = params.initialSource;
     let pendingSave: Promise<void> = Promise.resolve();
 
@@ -127,6 +144,13 @@ export class TableViewController {
 
   public createInlineTableView(params: InlineTableViewParams): NotionTableView {
     const { sourcePath, tableData, startLine, tableIndex } = params;
+    if (!isStableTableId(tableData.id)) {
+      tableData.id = buildStableTableId({
+        sourcePath,
+        headers: tableData.headers,
+        occurrence: tableIndex,
+      });
+    }
 
     const persist: PersistOperation = async (operation, previousHeaders) => {
       const transform = createDocumentTransform(
@@ -142,12 +166,17 @@ export class TableViewController {
     return this.createView(tableData, persist, sourcePath);
   }
 
-  private createView(
+  public rebindTableId(view: NotionTableView, newTableId: string): void {
+    if (!newTableId || view.tableData.id === newTableId) return;
+    const handler = this.rebindHandlers.get(view);
+    handler?.(newTableId);
+  }
+
+  private prepareColumns(
     tableData: MarkdownTableData,
-    persist: PersistOperation,
-    sourcePath: string
-  ): NotionTableView {
-    const settings = this.settingsService.getSettings();
+    settings: PluginSettings,
+    onSyncGroupOrders: (patch: Partial<PluginSettings>) => Promise<void>
+  ): TableColumn[] {
     const columns = this.stateManager.analyzeColumns(tableData, settings);
     const savedGroupOrders = settings.tableBoardGroupOrders?.[tableData.id] ?? {};
     const tableGroupOrders: Record<string, string[]> = { ...savedGroupOrders };
@@ -175,15 +204,84 @@ export class TableViewController {
     }
 
     if (JSON.stringify(savedGroupOrders) !== JSON.stringify(tableGroupOrders)) {
-      void this.settingsService.updateSettings({
+      void onSyncGroupOrders({
         tableBoardGroupOrders: {
           ...(settings.tableBoardGroupOrders ?? {}),
           [tableData.id]: tableGroupOrders,
         },
       });
     }
-    const filterState = this.stateManager.getOrCreateFilterState(tableData.id);
+
+    return columns;
+  }
+
+  private prepareFilterState(
+    tableId: string,
+    colCount: number,
+    settings: PluginSettings
+  ): TableFilterState {
+    const filterState = this.stateManager.getOrCreateFilterState(tableId);
     filterState.sortRules ??= [];
+
+    if (filterState.sortRules.length === 0) {
+      const savedRules = settings.tableSortRules?.[tableId];
+      if (savedRules && savedRules.length > 0) {
+        const validRules = savedRules
+          .filter((rule) => rule.columnIndex >= 0 && rule.columnIndex < colCount)
+          .map((rule) => ({ ...rule }));
+        if (validRules.length > 0) {
+          filterState.sortRules = validRules;
+          this.stateManager.setFilterState(tableId, filterState);
+        }
+      }
+    }
+
+    return filterState;
+  }
+
+  private async migrateTableSettings(
+    oldId: string,
+    newId: string,
+    filterState: TableFilterState,
+    updateSettings: (patch: Partial<PluginSettings>) => Promise<void>
+  ): Promise<void> {
+    this.stateManager.setFilterState(newId, filterState);
+
+    const latestSettings = this.settingsService.getSettings();
+    const patch: Partial<PluginSettings> = {};
+
+    const perTableKeys = [
+      "tableColumnWidths",
+      "tableBoardGroupOrders",
+      "tableSortRules",
+      "tableWideModes",
+      "tableBoardViews",
+    ] as const;
+    for (const key of perTableKeys) {
+      moveTableSettingKey(patch, latestSettings, key, oldId, newId);
+    }
+
+    if (Object.keys(patch).length > 0) {
+      await updateSettings(patch);
+    }
+  }
+
+  private createView(
+    tableData: MarkdownTableData,
+    persist: PersistOperation,
+    sourcePath: string
+  ): NotionTableView {
+    const silentSnapshots = new WeakSet<PluginSettings>();
+
+    const updateSettingsSilently = async (patch: Partial<PluginSettings>): Promise<void> => {
+      const savePromise = this.settingsService.updateSettings(patch);
+      silentSnapshots.add(this.settingsService.getSettings());
+      await savePromise;
+    };
+
+    const settings = this.settingsService.getSettings();
+    let columns = this.prepareColumns(tableData, settings, updateSettingsSilently);
+    let filterState = this.prepareFilterState(tableData.id, columns.length, settings);
 
     let view: NotionTableView | null = null;
 
@@ -198,6 +296,23 @@ export class TableViewController {
       if (!operation) return;
 
       await persist(operation, previousHeaders);
+      if (
+        operation.kind === "rename-column" &&
+        isStableTableId(tableData.id) &&
+        normalizeTableHeaderSignature(previousHeaders) !==
+          normalizeTableHeaderSignature(tableData.headers)
+      ) {
+        const oldId = tableData.id;
+        const newId = buildStableTableId({
+          sourcePath,
+          headers: tableData.headers,
+          occurrence: parseOccurrenceFromTableId(oldId),
+        });
+        if (newId !== oldId) {
+          tableData.id = newId;
+          await this.migrateTableSettings(oldId, newId, filterState, updateSettingsSilently);
+        }
+      }
       this.restoreEditorScroll(sourcePath);
       if (typeof window !== "undefined") {
         let frames = 0;
@@ -321,6 +436,7 @@ export class TableViewController {
         }),
 
       onFilterChange: (newState) => {
+        filterState = newState;
         this.stateManager.setFilterState(tableData.id, newState);
       },
 
@@ -328,6 +444,14 @@ export class TableViewController {
         filterState.sortRules = sortRules;
         this.stateManager.setFilterState(tableData.id, filterState);
         view?.render();
+        const latestSettings = this.settingsService.getSettings();
+        const nextSortRules = { ...(latestSettings.tableSortRules ?? {}) };
+        if (sortRules.length > 0) {
+          nextSortRules[tableData.id] = sortRules.map((rule) => ({ ...rule }));
+        } else {
+          delete nextSortRules[tableData.id];
+        }
+        void updateSettingsSilently({ tableSortRules: nextSortRules });
       },
 
       onTagColorChange: async (tagName, color) => {
@@ -345,6 +469,29 @@ export class TableViewController {
         };
         await this.settingsService.updateSettings({ tableColumnWidths });
       },
+
+      onWideModeChange: async (isWide) => {
+        const currentSettings = this.settingsService.getSettings();
+        const tableWideModes = { ...(currentSettings.tableWideModes ?? {}) };
+        if (isWide) {
+          tableWideModes[tableData.id] = true;
+        } else {
+          delete tableWideModes[tableData.id];
+        }
+        await this.settingsService.updateSettings({ tableWideModes });
+      },
+
+      onBoardViewChange: async (isVisible) => {
+        const currentSettings = this.settingsService.getSettings();
+        const defaultVisible = currentSettings.showBoardView ?? true;
+        const tableBoardViews = { ...(currentSettings.tableBoardViews ?? {}) };
+        if (isVisible === defaultVisible) {
+          delete tableBoardViews[tableData.id];
+        } else {
+          tableBoardViews[tableData.id] = isVisible;
+        }
+        await this.settingsService.updateSettings({ tableBoardViews });
+      },
     };
 
     view = new NotionTableView({
@@ -357,7 +504,21 @@ export class TableViewController {
       actions,
     });
 
+    this.rebindHandlers.set(view, (newTableId: string) => {
+      if (!view || tableData.id === newTableId) return;
+      tableData.id = newTableId;
+      const latestSettings = this.settingsService.getSettings();
+      columns = this.prepareColumns(tableData, latestSettings, updateSettingsSilently);
+      filterState = this.prepareFilterState(newTableId, columns.length, latestSettings);
+      view.syncSettings(latestSettings);
+      view.rebindState(tableData, columns, filterState);
+    });
+
     const unsubscribe = this.settingsService.subscribe((updatedSettings) => {
+      if (silentSnapshots.has(updatedSettings)) {
+        view?.syncSettings(updatedSettings);
+        return;
+      }
       view?.updateSettings(updatedSettings);
     });
     view.registry.addFn(unsubscribe);
@@ -554,4 +715,26 @@ function createDocumentTransform(
           tableIndex
         );
   }
+}
+
+type PerTableSettingKey =
+  | "tableColumnWidths"
+  | "tableBoardGroupOrders"
+  | "tableSortRules"
+  | "tableWideModes"
+  | "tableBoardViews";
+
+/** Moves a per-table settings entry from oldId to newId when present. */
+function moveTableSettingKey<K extends PerTableSettingKey>(
+  patch: Partial<PluginSettings>,
+  settings: PluginSettings,
+  key: K,
+  oldId: string,
+  newId: string
+): void {
+  const map = settings[key] as Record<string, unknown> | undefined;
+  if (!map || map[oldId] === undefined) return;
+  const next = { ...map, [newId]: map[oldId] };
+  delete next[oldId];
+  patch[key] = next as PluginSettings[K];
 }

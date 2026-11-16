@@ -538,14 +538,14 @@ describe("TablePostProcessor source parsing", () => {
   });
   it("should recover a type annotation the renderer dropped from the header", () => {
     const text = [
-      "| Модуль | Категория [text] |",
+      "| Module | Domain [text] |",
       "| --- | --- |",
-      "| Ядро | Architecture, Core |",
+      "| Core | Architecture, Core |",
     ].join("\n");
 
     // The rendered header lost its "[text]" suffix.
     const { processor, ctx } = createProcessor({ text, lineStart: 0, lineEnd: 2 });
-    const wrapper = buildRenderedTable(["Модуль", "Категория"], [["Ядро", "Architecture, Core"]]);
+    const wrapper = buildRenderedTable(["Module", "Domain"], [["Core", "Architecture, Core"]]);
 
     processor.process(wrapper, ctx);
 
@@ -555,15 +555,15 @@ describe("TablePostProcessor source parsing", () => {
   });
 
   it("should keep the rendered header when the source header carries Markdown", () => {
-    const text = ["| Модуль | **Категория** |", "| --- | --- |", "| Ядро | Core |"].join("\n");
+    const text = ["| Module | **Domain** |", "| --- | --- |", "| Core | Core |"].join("\n");
 
     const { processor, ctx } = createProcessor({ text, lineStart: 0, lineEnd: 2 });
-    const wrapper = buildRenderedTable(["Модуль", "Категория"], [["Ядро", "Core"]]);
+    const wrapper = buildRenderedTable(["Module", "Domain"], [["Core", "Core"]]);
 
     processor.process(wrapper, ctx);
 
     const names = Array.from(wrapper.querySelectorAll(".ms-db-col-name")).map((el) => el.textContent);
-    expect(names).toEqual(["Модуль", "Категория"]);
+    expect(names).toEqual(["Module", "Domain"]);
   });
 
   it("should bring inline code back in cells the renderer flattened", () => {
@@ -581,7 +581,7 @@ describe("TablePostProcessor source parsing", () => {
 
   it("should bring wikilinks back to life in cells the renderer flattened", () => {
     const text = [
-      "| Заметка | Проверено |",
+      "| Note | Checked |",
       "| --- | --- |",
       "| [[System Design]] | [x] |",
       "| [[Obsidian API|Obsidian]] | [ ] |",
@@ -590,7 +590,7 @@ describe("TablePostProcessor source parsing", () => {
     const { processor, ctx } = createProcessor({ text, lineStart: 0, lineEnd: 3 });
     // Obsidian renders the wikilinks as bare text inside the <td>.
     const wrapper = buildRenderedTable(
-      ["Заметка", "Проверено"],
+      ["Note", "Checked"],
       [["System Design", "[x]"], ["Obsidian", "[ ]"]]
     );
 
@@ -607,15 +607,108 @@ describe("TablePostProcessor source parsing", () => {
   });
 
   it("should keep the rendered text for cells whose Markdown it cannot draw", () => {
-    const text = ["| Заметка |", "| --- |", "| **важно** |"].join("\n");
+    const text = ["| Note |", "| --- |", "| **important** |"].join("\n");
 
     const { processor, ctx } = createProcessor({ text, lineStart: 0, lineEnd: 2 });
-    const wrapper = buildRenderedTable(["Заметка"], [["важно"]]);
+    const wrapper = buildRenderedTable(["Note"], [["important"]]);
 
     processor.process(wrapper, ctx);
 
     const cell = wrapper.querySelector<HTMLElement>('.ms-db-td[data-col-index="0"]');
-    expect(cell?.textContent).toBe("важно");
+    expect(cell?.textContent).toBe("important");
+  });
+
+  it("should isolate two inline tables with identical headers in separate rendered sections (#23)", async () => {
+    const docText = [
+      "## First",
+      "",
+      "| Task | Status |",
+      "| --- | --- |",
+      "| Alpha | Todo |",
+      "",
+      "## Second",
+      "",
+      "| Task | Status |",
+      "| --- | --- |",
+      "| Beta | Done |",
+    ].join("\n");
+
+    const settingsService = new SettingsService({
+      loadData: async () => null,
+      saveData: async () => undefined,
+    });
+    const stateManager = new TableStateManager();
+    const app = { vault: {}, workspace: {} } as unknown as App;
+    const controller = new TableViewController(
+      app,
+      settingsService,
+      stateManager,
+      new TableSyncService(new VaultService(app))
+    );
+    const processor = new TablePostProcessor(controller, new TableViewRegistry(), settingsService);
+
+    const wrapper1 = buildRenderedTable(["Task", "Status"], [["Alpha", "Todo"]]);
+    const wrapper2 = buildRenderedTable(["Task", "Status"], [["Beta", "Done"]]);
+
+    const ctx1 = {
+      docId: "doc",
+      sourcePath: "Notes/Dual.md",
+      frontmatter: null,
+      addChild: vi.fn(),
+      getSectionInfo: () => ({ text: docText, lineStart: 2, lineEnd: 4 }),
+    } as unknown as MarkdownPostProcessorContext;
+    const ctx2 = {
+      docId: "doc",
+      sourcePath: "Notes/Dual.md",
+      frontmatter: null,
+      addChild: vi.fn(),
+      getSectionInfo: () => ({ text: docText, lineStart: 8, lineEnd: 10 }),
+    } as unknown as MarkdownPostProcessorContext;
+
+    processor.process(wrapper1, ctx1);
+    processor.process(wrapper2, ctx2);
+
+    // Switch table 1 to board view; table 2 must remain in table view.
+    wrapper1.querySelector<HTMLButtonElement>(".ms-db-view-tab-btn:not(.is-active)")?.click();
+    expect(wrapper1.querySelector(".ms-kanban-board-wrapper")).not.toBeNull();
+    expect(wrapper2.querySelector(".ms-kanban-board-wrapper")).toBeNull();
+    expect(wrapper2.querySelector(".ms-db-grid-table")).not.toBeNull();
+  });
+
+  it("should preserve relative markdown and escaped wikilink columns with commas as clickable text links", () => {
+    const text = [
+      "| Step | Task / full prompt | Role |",
+      "| --- | --- | --- |",
+      "| 1 | [SPEC-01 — Core contract v2.0](prompts/spec01.md) | Implementation |",
+      "| 2 | [TASK-02 — Persisted messages, restart and clean lifecycle](prompts/task02.md) | Implementation |",
+      "| 3 | [[prompts/task04\\|TASK-04 — History sidebar: restore, rename, delete and temporary mode]] | Implementation |",
+    ].join("\n");
+
+    const { processor, ctx } = createProcessor({ text, lineStart: 0, lineEnd: 4 });
+    const wrapper = buildRenderedTable(
+      ["Step", "Task / full prompt", "Role"],
+      [
+        ["1", "SPEC-01 — Core contract v2.0", "Implementation"],
+        ["2", "TASK-02 — Persisted messages, restart and clean lifecycle", "Implementation"],
+        ["3", "TASK-04 — History sidebar: restore, rename, delete and temporary mode", "Implementation"],
+      ]
+    );
+
+    processor.process(wrapper, ctx);
+
+    const taskCells = wrapper.querySelectorAll<HTMLElement>('.ms-db-td[data-col-index="1"]');
+    expect(taskCells.length).toBe(3);
+    expect(wrapper.querySelectorAll('.ms-db-td[data-col-index="1"] .ms-tag-pill').length).toBe(0);
+
+    const links = wrapper.querySelectorAll<HTMLElement>(
+      '.ms-db-td[data-col-index="1"] .ms-cell-link.internal-link'
+    );
+    expect(links.length).toBe(3);
+    expect(links[1].textContent).toBe(
+      "TASK-02 — Persisted messages, restart and clean lifecycle"
+    );
+    expect(links[1].dataset.href).toBe("prompts/task02.md");
+    expect(links[2].dataset.href).toBe("prompts/task04");
   });
 
 });

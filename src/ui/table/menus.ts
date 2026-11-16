@@ -22,6 +22,8 @@ import {
   ICON_EYE_OFF,
   ICON_TRASH,
   ICON_TYPE_NUMBER,
+  ICON_VIEW_BOARD,
+  ICON_WIDE_MODE,
 } from "../icons";
 import { confirmAction } from "../modals/confirm-modal";
 import { RenameColumnModal } from "../modals/rename-column-modal";
@@ -146,42 +148,56 @@ export class TableMenus {
     this.ctx.render();
   }
 
+  private addOptionToggleItem(
+    menu: HTMLElement,
+    icon: string,
+    label: string,
+    isSelected: boolean,
+    onSelect: () => void
+  ): void {
+    const item = menu.createDiv({
+      cls: `ms-menu-item ms-prop-toggle-item ${isSelected ? "is-selected" : ""}`,
+    });
+    appendIcon(item.createSpan({ cls: "ms-prop-icon" }), icon);
+    item.createSpan({ text: label });
+    const check = item.createSpan({ cls: "ms-prop-check" });
+    if (isSelected) {
+      appendIcon(check, ICON_CHECK);
+    }
+    item.addEventListener("click", () => {
+      this.closeActivePopover();
+      onSelect();
+    });
+  }
+
   public openPropertiesMenu(anchor: HTMLElement): void {
     const menu = createMenuElement("ms-props-menu");
 
     menu.createDiv({ cls: "ms-menu-section-title", text: "Table Options" });
 
     const isRowNumbersVisible = this.ctx.isRowNumbersVisible();
-    const rowNumbersItem = menu.createDiv({
-      cls: `ms-menu-item ms-prop-toggle-item ${isRowNumbersVisible ? "is-selected" : ""}`,
-    });
-    appendIcon(rowNumbersItem.createSpan({ cls: "ms-prop-icon" }), ICON_TYPE_NUMBER);
-    rowNumbersItem.createSpan({ text: "Row numbers" });
-    const rowNumbersCheck = rowNumbersItem.createSpan({ cls: "ms-prop-check" });
-    if (isRowNumbersVisible) {
-      appendIcon(rowNumbersCheck, ICON_CHECK);
-    }
-    rowNumbersItem.addEventListener("click", () => {
-      this.closeActivePopover();
-      this.setRowNumbersVisible(!isRowNumbersVisible);
-    });
+    this.addOptionToggleItem(menu, ICON_TYPE_NUMBER, "Row numbers", isRowNumbersVisible, () =>
+      this.setRowNumbersVisible(!isRowNumbersVisible)
+    );
 
     const showCalculationRow = this.ctx.filterState.showCalculationRow === true;
-    const calculationRowItem = menu.createDiv({
-      cls: `ms-menu-item ms-prop-toggle-item ${showCalculationRow ? "is-selected" : ""}`,
-    });
-    appendIcon(calculationRowItem.createSpan({ cls: "ms-prop-icon" }), ICON_TYPE_NUMBER);
-    calculationRowItem.createSpan({ text: "Calculation row" });
-    const calculationRowCheck = calculationRowItem.createSpan({ cls: "ms-prop-check" });
-    if (showCalculationRow) {
-      appendIcon(calculationRowCheck, ICON_CHECK);
-    }
-    calculationRowItem.addEventListener("click", () => {
-      this.closeActivePopover();
+    this.addOptionToggleItem(menu, ICON_TYPE_NUMBER, "Calculation row", showCalculationRow, () => {
       this.ctx.filterState.showCalculationRow = !showCalculationRow;
       this.ctx.actions.onFilterChange(this.ctx.filterState);
       this.ctx.render();
     });
+
+    this.addOptionToggleItem(menu, ICON_WIDE_MODE, "Wide mode", this.ctx.isWideMode(), () =>
+      this.ctx.toggleWideMode()
+    );
+
+    this.addOptionToggleItem(
+      menu,
+      ICON_VIEW_BOARD,
+      "Board view",
+      this.ctx.isBoardViewVisible(),
+      () => this.ctx.toggleBoardView()
+    );
 
     menu.createDiv({ cls: "ms-menu-divider" });
     menu.createDiv({ cls: "ms-menu-section-title", text: "Visible Properties" });
