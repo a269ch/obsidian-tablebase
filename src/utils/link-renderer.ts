@@ -119,11 +119,14 @@ function isAllowedExternalDestination(destination: string): boolean {
 }
 
 function isNoteLink(destination: string): boolean {
-  return (
-    Boolean(destination) &&
-    !URI_SCHEME_PATTERN.test(destination) &&
-    !/^[\\/]{2}|[\u0000-\u001f\u007f]/.test(destination)
-  );
+  if (!destination || URI_SCHEME_PATTERN.test(destination) || /^[\\/]{2}/.test(destination)) {
+    return false;
+  }
+  for (let index = 0; index < destination.length; index++) {
+    const code = destination.charCodeAt(index);
+    if (code <= 0x1f || code === 0x7f) return false;
+  }
+  return true;
 }
 
 function decodeInternalLinkPath(path: string): string {

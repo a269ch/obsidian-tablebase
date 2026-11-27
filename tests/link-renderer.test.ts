@@ -65,6 +65,16 @@ describe("link-renderer", () => {
     expect(onInternalClick).not.toHaveBeenCalled();
   });
 
+  it.each([0x00, 0x1f, 0x7f])("rejects control character %i in a note link", (code) => {
+    const literal = String.fromCharCode(code);
+    const encoded = `%${code.toString(16).padStart(2, "0")}`;
+    for (const character of [literal, encoded]) {
+      expect(parseLinkTokens(`[Note](folder/Some${character}Note.md)`)).toEqual([
+        { type: "text", text: "Note" },
+      ]);
+    }
+  });
+
   it("should parse obsidian internal wiki links with and without alias", () => {
     const tokens = parseLinkTokens("Check [[Project Plan]] and [[Meeting Notes|notes from Monday]].");
     expect(tokens).toEqual([
