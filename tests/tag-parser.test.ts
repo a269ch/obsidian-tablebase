@@ -22,10 +22,11 @@ describe("Tag Parser & Formatter", () => {
     });
 
     it("should parse wikilinks", () => {
-      const tags = parseCellTags("[[Project Alpha]], [[Team Beta|Alias]]");
-      expect(tags.length).toBe(2);
+      const tags = parseCellTags("[[Project Alpha]], [[Team Beta|Alias]], [[Escaped\\|Shown]]");
+      expect(tags.length).toBe(3);
       expect(tags[0].name).toBe("Project Alpha");
       expect(tags[1].name).toBe("Team Beta");
+      expect(tags[2].name).toBe("Escaped");
     });
 
     it("should parse hashtags including alphanumeric and underscores", () => {
@@ -90,17 +91,51 @@ describe("Tag Parser & Formatter", () => {
 
     it("should treat a column of single wikilinks as links, not tags", () => {
       const values = ["[[System Design]]", "[[Obsidian API]]", "[[REST]]"];
-      expect(looksLikeMultiSelect(values, "Заметка")).toBe(false);
+      expect(looksLikeMultiSelect(values, "Note")).toBe(false);
     });
 
     it("should still detect cells holding several wikilinks", () => {
       const values = ["[[Sync]] [[Network]]", "[[Libs]] [[Utils]]", "[[Core]]"];
-      expect(looksLikeMultiSelect(values, "Заметка")).toBe(true);
+      expect(looksLikeMultiSelect(values, "Note")).toBe(true);
+    });
+
+    it("keeps Markdown and external links out of auto-detected multi-select columns", () => {
+      expect(looksLikeMultiSelect(["[Guide](Guide.md) [Plan](Plan.md)"], "References")).toBe(false);
+      expect(looksLikeMultiSelect(["[Guide](Guide.md), [[Plan]]"], "References")).toBe(false);
+      expect(looksLikeMultiSelect(["https://example.org, https://example.com"], "References")).toBe(false);
     });
 
     it("should return false for regular single-value columns", () => {
       const values = ["Alice", "Bob", "Charlie", "David"];
       expect(looksLikeMultiSelect(values, "Author")).toBe(false);
+    });
+
+    it("should not misdetect single links or prose with commas as multi-select", () => {
+      expect(
+        looksLikeMultiSelect(
+          [
+            "[[prompts/task02\\|TASK-02 — Persisted messages, restart and clean lifecycle]]",
+            "[TASK-04 — History sidebar: restore, rename, delete and temporary mode](prompts/task04.md)",
+            "[OBS-01 — Safe logs, errors, panic and crash metadata](prompts/obs01.md)",
+          ],
+          "Task / full prompt"
+        )
+      ).toBe(false);
+
+      expect(
+        looksLikeMultiSelect(
+          [
+            "TASK-02 — Persisted messages, restart and clean lifecycle",
+            "TASK-04 — History sidebar: restore, rename, delete and temporary mode",
+            "OBS-01 — Safe logs, errors, panic and crash metadata",
+          ],
+          "Task / full prompt"
+        )
+      ).toBe(false);
+
+      expect(looksLikeMultiSelect(["fn(a, b)", "map(x, y)", "plain"], "Expr")).toBe(false);
+      expect(looksLikeMultiSelect(["1,200", "3,450", "500"], "Budget")).toBe(false);
+      expect(looksLikeMultiSelect(["Fix #12", "Ref #34", "Done"], "Notes")).toBe(false);
     });
   });
 });

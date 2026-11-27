@@ -30,8 +30,9 @@
 }
 
 .ms-notion-database-container {
-  margin: 1.25rem 0 1.25rem 26px;
-  max-width: calc(100% - 26px);
+  --ms-narrow-inset: 26px;
+  margin: 1.25rem 0 1.25rem var(--ms-narrow-inset);
+  max-width: calc(100% - var(--ms-narrow-inset));
   border: 1px solid var(--ms-border);
   border-radius: 8px;
   background-color: var(--background-primary);
@@ -125,6 +126,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-left: auto;
 }
 
 .ms-db-action-btn {
@@ -150,6 +152,35 @@
 .ms-db-action-btn.is-active {
   background-color: rgba(35, 131, 226, 0.12);
   color: var(--ms-blue-accent);
+}
+
+.ms-wide-mode-btn {
+  padding: 4px 6px;
+}
+
+.ms-notion-database-container:not([data-ms-wide-available]) > .ms-db-top-bar .ms-wide-mode-btn,
+.ms-notion-database-container:not([data-ms-wide-available]) > .ms-kanban-container .ms-wide-mode-btn {
+  display: none;
+}
+
+.ms-wide-mode-host,
+.el-table.ms-wide-mode-host,
+.table-wrapper.ms-wide-mode-host,
+.el-pre.ms-wide-mode-host,
+.cm-embed-block.ms-wide-mode-host,
+.cm-preview-code-block.ms-wide-mode-host,
+.markdown-rendered .ms-wide-mode-host {
+  overflow: visible;
+}
+
+.ms-notion-database-container.is-wide-mode[data-ms-wide-available],
+.ms-enhanced-table-wrapper > .ms-notion-database-container.is-wide-mode[data-ms-wide-available],
+.el-table.ms-enhanced-table-wrapper > .ms-notion-database-container.is-wide-mode[data-ms-wide-available],
+.markdown-rendered .ms-enhanced-table-wrapper > .ms-notion-database-container.is-wide-mode[data-ms-wide-available] {
+  width: var(--ms-wide-width, calc(100% - var(--ms-narrow-inset)));
+  max-width: var(--ms-wide-width, none);
+  margin-left: var(--ms-wide-offset-left, var(--ms-narrow-inset));
+  margin-right: 0;
 }
 
 .ms-group-by-wrapper {
@@ -507,8 +538,8 @@ input[type="text"].ms-filter-value-input:focus {
 .markdown-rendered .ms-enhanced-table-wrapper > .ms-notion-database-container {
   margin-top: 0;
   margin-bottom: 0;
-  margin-left: 26px;
-  max-width: calc(100% - 26px);
+  margin-left: var(--ms-narrow-inset);
+  max-width: calc(100% - var(--ms-narrow-inset));
 }
 
 .ms-table-hidden {
@@ -2596,6 +2627,12 @@ input[type="text"].ms-modal-name-input.is-invalid {
 }
 
 @media print {
+  body .ms-notion-database-container.is-wide-mode[data-ms-wide-available] {
+    width: auto;
+    max-width: calc(100% - var(--ms-narrow-inset));
+    margin-left: var(--ms-narrow-inset);
+  }
+
   body .ms-enhanced-table-wrapper > table.ms-table-hidden {
     display: table;
   }

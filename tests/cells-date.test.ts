@@ -88,6 +88,10 @@ function createContext(columns: TableColumn[], rows: MarkdownTableRow[]) {
     filterState,
     settings: { ...DEFAULT_SETTINGS },
     isRowNumbersVisible: () => false,
+    isWideMode: () => false,
+    toggleWideMode: vi.fn(),
+    isBoardViewVisible: () => true,
+    toggleBoardView: vi.fn(),
     getVisibleColumns: () => columns,
     render: vi.fn(),
     renderRows: vi.fn(),
@@ -288,7 +292,7 @@ describe("CellRenderer date cells", () => {
     expect(extLinks[1].textContent).toBe("https://google.com");
 
     extLinks[0].dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(windowOpenSpy).toHaveBeenCalledWith("https://obsidian.md", "_blank");
+    expect(windowOpenSpy).toHaveBeenCalledWith("https://obsidian.md", "_blank", "noopener,noreferrer");
 
     const intLink = td.querySelector<HTMLAnchorElement>("a.internal-link");
     expect(intLink).not.toBeNull();

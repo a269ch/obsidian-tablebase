@@ -96,7 +96,10 @@ export class CellRenderer {
     checkbox.addEventListener("change", (e) => {
       this.focusCell(row.rowIndex, colIndex);
       const newValue = (e.target as HTMLInputElement).checked ? "[x]" : "[ ]";
-      void this.ctx.actions.onCellUpdate(row.rowIndex, colIndex, newValue);
+      void (async () => {
+        await this.ctx.actions.onCellUpdate(row.rowIndex, colIndex, newValue);
+        this.ctx.render();
+      })();
     });
 
     td.addEventListener("click", () => this.focusCell(row.rowIndex, colIndex));
@@ -217,7 +220,7 @@ export class CellRenderer {
           e.stopPropagation();
           this.focusCell(row.rowIndex, colIndex);
           if (typeof window !== "undefined" && url) {
-            window.open(url, "_blank");
+            window.open(url, "_blank", "noopener,noreferrer");
           }
         },
         onInternalClick: (path, e) => {

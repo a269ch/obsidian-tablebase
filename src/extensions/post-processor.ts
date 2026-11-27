@@ -1,5 +1,6 @@
 import { MarkdownPostProcessorContext, MarkdownSectionInformation } from "obsidian";
 import { findTargetTable, parseMarkdownTables } from "../core/markdown-parser";
+import { buildStableTableId, findTableOccurrenceInDocument } from "../core/table-id";
 import { stripTypeAnnotation } from "../core/table-mutator";
 import { toPlainText } from "../utils/link-renderer";
 import { TableViewController } from "../services/table-view-controller";
@@ -149,10 +150,22 @@ export class TablePostProcessor {
     const startLine = sectionInfo ? sectionInfo.lineStart : -1;
     const endLine = sectionInfo ? sectionInfo.lineEnd : -1;
     const source = this.findSourceTable(sectionInfo, headers, rows.length, tableIndex);
+    const reconciledHeaders = this.reconcileHeaders(headers, source);
+    const occurrence =
+      sectionInfo?.text && source
+        ? findTableOccurrenceInDocument(sectionInfo.text, {
+            startLine: source.startLine,
+            isCodeBlock: false,
+          })
+        : tableIndex;
 
     const tableData: MarkdownTableData = {
-      id: `tbl_${ctx.sourcePath || "doc"}_${tableIndex}`,
-      headers: this.reconcileHeaders(headers, source),
+      id: buildStableTableId({
+        sourcePath: ctx.sourcePath,
+        headers: source?.headers ?? reconciledHeaders,
+        occurrence,
+      }),
+      headers: reconciledHeaders,
       alignments: source
         ? [...source.alignments]
         : new Array<string>(headers.length).fill("---"),

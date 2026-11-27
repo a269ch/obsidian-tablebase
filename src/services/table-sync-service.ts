@@ -1,48 +1,13 @@
-import { serializeMarkdownTable } from "../core/markdown-parser";
-import { TABLE_CODE_BLOCK_LANGUAGES } from "../extensions/codeblock-processor";
+import {
+  FencedBlock,
+  findFencedBlocks,
+  serializeMarkdownTable,
+  TABLE_CODE_BLOCK_LANGUAGES,
+} from "../core/markdown-parser";
 import { MarkdownTableData } from "../types";
 import { VaultService } from "./vault-service";
 
-// Optional blockquote/callout markers and indentation, the fence, then the info string.
-const FENCE_OPEN = /^((?:[ \t]*>)*[ \t]*)(`{3,}|~{3,})[ \t]*([^\s`]*)/;
-
-interface FencedBlock {
-  openLine: number;
-  closeLine: number;
-  prefix: string;
-  language: string;
-  body: string;
-}
-
-function stripPrefix(line: string, prefix: string): string | null {
-  if (line.startsWith(prefix)) return line.slice(prefix.length);
-  if (line.trimEnd() === prefix.trimEnd()) return "";
-  return null;
-}
-
-function isClosingFence(line: string, prefix: string, fence: string): boolean {
-  const rest = (stripPrefix(line, prefix) ?? line).trim();
-  return rest.length >= fence.length && [...rest].every((char) => char === fence[0]);
-}
-
-// Lines are passed without "\r"; blocks inside other fenced blocks are skipped.
-function findFencedBlocks(lines: string[]): FencedBlock[] {
-  const blocks: FencedBlock[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    const match = FENCE_OPEN.exec(lines[i]);
-    if (!match) continue;
-    const [, prefix, fence, language] = match;
-    if (fence[0] === "`" && lines[i].slice(match[0].length).includes("`")) continue;
-
-    const closeLine = lines.findIndex((line, j) => j > i && isClosingFence(line, prefix, fence));
-    if (closeLine === -1) break;
-
-    const bodyLines = lines.slice(i + 1, closeLine).map((line) => stripPrefix(line, prefix) ?? line);
-    blocks.push({ openLine: i, closeLine, prefix, language: language.toLowerCase(), body: bodyLines.join("\n") });
-    i = closeLine;
-  }
-  return blocks;
-}
+export type CodeBlockRewrite = (previous: string, next: string, line: number) => void;
 
 // A table block at the hinted line must match; otherwise the only match wins. Anything ambiguous returns undefined.
 function pickBlock(
@@ -75,7 +40,8 @@ export class TableSyncService {
     sourcePath: string,
     tableData: MarkdownTableData,
     initialSource?: string,
-    lineHint?: number
+    lineHint?: number,
+    onRewrite?: CodeBlockRewrite
   ): Promise<boolean> {
     if (!sourcePath) return false;
 
@@ -102,7 +68,9 @@ export class TableSyncService {
       });
       lines.splice(block.openLine + 1, block.closeLine - block.openLine - 1, ...bodyLines);
       replaced = true;
-      return lines.join("\n");
+      const next = lines.join("\n");
+      onRewrite?.(content, next, block.openLine);
+      return next;
     };
 
     const modified = await this.vaultService.modifyFile(sourcePath, transform);
@@ -112,8 +80,7 @@ export class TableSyncService {
   public async syncInlineTable(
     sourcePath: string,
     transform: (content: string) => string
-  ): Promise<void> {
-    if (!sourcePath) return;
-    await this.vaultService.modifyFile(sourcePath, transform);
+  ): Promise<boolean> {
+    return Boolean(sourcePath) && this.vaultService.modifyFile(sourcePath, transform);
   }
 }

@@ -49,6 +49,32 @@ describe("link-renderer", () => {
     ]);
   });
 
+  it.each([
+    "javascript:blocked", "DATA:text/plain,data", "file:///some/path",
+    "unsupported-scheme:example", "//example.org/path", "%6Aavascript%3Ablocked",
+    "obsidian://unrecognized-handler",
+  ])("renders a disallowed Markdown destination as plain text (%s)", (destination) => {
+    const container = document.createElement("div");
+    const onExternalClick = vi.fn();
+    const onInternalClick = vi.fn();
+    renderTextWithLinks(container, `[Example](${destination})`, { onExternalClick, onInternalClick });
+
+    expect(container.textContent).toBe("Example");
+    expect(container.querySelector("a")).toBeNull();
+    expect(onExternalClick).not.toHaveBeenCalled();
+    expect(onInternalClick).not.toHaveBeenCalled();
+  });
+
+  it.each([0x00, 0x1f, 0x7f])("rejects control character %i in a note link", (code) => {
+    const literal = String.fromCharCode(code);
+    const encoded = `%${code.toString(16).padStart(2, "0")}`;
+    for (const character of [literal, encoded]) {
+      expect(parseLinkTokens(`[Note](folder/Some${character}Note.md)`)).toEqual([
+        { type: "text", text: "Note" },
+      ]);
+    }
+  });
+
   it("should parse obsidian internal wiki links with and without alias", () => {
     const tokens = parseLinkTokens("Check [[Project Plan]] and [[Meeting Notes|notes from Monday]].");
     expect(tokens).toEqual([
@@ -209,5 +235,24 @@ describe("link-renderer", () => {
     expect(code?.textContent).toBe("= this.file.name");
     expect(container.querySelector("code")).toBeNull();
     expect(container.textContent).toBe("Run = this.file.name now");
+  });
+
+  it("should parse relative markdown links as internal links and strip GFM escaped pipes in wikilinks", () => {
+    expect(parseLinkTokens("[CHAT02 — A, B](prompts/CHAT02.md)")).toEqual([
+      { type: "internal", text: "CHAT02 — A, B", href: "prompts/CHAT02.md" },
+    ]);
+    expect(parseLinkTokens("[Spaced](<folder/My Note.md#Top>)")).toEqual([
+      { type: "internal", text: "Spaced", href: "folder/My Note.md#Top" },
+    ]);
+    expect(parseLinkTokens("[Encoded](folder/My%20Note.md)")).toEqual([
+      { type: "internal", text: "Encoded", href: "folder/My Note.md" },
+    ]);
+    expect(parseLinkTokens("[Open](obsidian://open?vault=Demo)")).toEqual([
+      { type: "external", text: "Open", href: "obsidian://open?vault=Demo" },
+    ]);
+    expect(parseLinkTokens("[[prompts/CHAT02\\|CHAT02 — A, B]]")).toEqual([
+      { type: "internal", text: "CHAT02 — A, B", href: "prompts/CHAT02" },
+    ]);
+    expect(toPlainText("[CHAT02 — A, B](prompts/CHAT02.md)")).toBe("CHAT02 — A, B");
   });
 });

@@ -11,6 +11,7 @@ import {
 } from "../icons";
 import { closeAllFloatingPopovers } from "../popover";
 import { TableMenus } from "./menus";
+import { createWideModeToggleButton } from "../wide-mode";
 import { TableViewContext } from "./types";
 
 const SEARCH_DEBOUNCE_MS = 120;
@@ -36,7 +37,9 @@ export class TableToolbar {
   public render(container: HTMLElement): void {
     const topBar = container.createDiv({ cls: "ms-db-top-bar" });
 
-    this.renderViewTabs(topBar.createDiv({ cls: "ms-db-header-left" }));
+    if (this.ctx.isBoardViewVisible()) {
+      this.renderViewTabs(topBar.createDiv({ cls: "ms-db-header-left" }));
+    }
     this.renderActions(topBar.createDiv({ cls: "ms-db-header-right" }));
   }
 
@@ -116,6 +119,10 @@ export class TableToolbar {
         this.menus.openExportMenu(exportBtn);
       }
     });
+
+    createWideModeToggleButton(rightHeader, this.ctx.isWideMode(), () =>
+      this.ctx.toggleWideMode()
+    );
   }
 
   private createActionButton(

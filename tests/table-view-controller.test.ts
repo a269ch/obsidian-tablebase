@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { App } from "obsidian";
 import { parseMarkdownTables, serializeMarkdownTable } from "../src/core/markdown-parser";
+import { buildStableTableId, findDocumentTableIdentities } from "../src/core/table-id";
 import { TableStateManager } from "../src/core/table-state";
 import { SettingsService } from "../src/services/settings-service";
 import { TableSyncService } from "../src/services/table-sync-service";
@@ -40,6 +41,26 @@ describe("TableViewController", () => {
     syncService = new TableSyncService(vaultService);
     controller = new TableViewController(app, settingsService, stateManager, syncService);
   });
+
+  function saveNote(initial: string): () => string {
+    let markdown = initial;
+    vi.mocked(vaultService.modifyFile).mockImplementation(async (_path, transform) => {
+      markdown = transform(markdown);
+      return true;
+    });
+    return () => markdown;
+  }
+
+  function openInline(markdown: string, sourcePath: string, index = 0): ReturnType<TableViewController["createInlineTableView"]> {
+    const tableData = parseMarkdownTables(markdown)[index];
+    const identity = findDocumentTableIdentities(markdown, sourcePath).find(
+      ({ sortLine }) => sortLine === tableData.startLine
+    );
+    tableData.id = identity!.id;
+    return controller.createInlineTableView({
+      sourcePath, tableData, startLine: tableData.startLine, tableIndex: index,
+    });
+  }
 
   it("should create code block view and sync on table modification", async () => {
     const raw = "| Col A | Col B |\n| --- | --- |\n| 1 | 2 |";
@@ -107,6 +128,7 @@ describe("TableViewController", () => {
       leaf.appendChild(replacement);
       replacement.scrollTop = 0;
       replacement.scrollLeft = 0;
+      return true;
     });
 
     const tableData = parseMarkdownTables(
@@ -200,6 +222,7 @@ describe("TableViewController", () => {
     let capturedTransform: ((content: string) => string) | null = null;
     vi.spyOn(syncService, "syncInlineTable").mockImplementation(async (_path, transform) => {
       capturedTransform = transform;
+      return true;
     });
 
     const view = controller.createInlineTableView({
@@ -258,6 +281,7 @@ describe("TableViewController", () => {
     let capturedTransform: ((content: string) => string) | null = null;
     vi.spyOn(syncService, "syncInlineTable").mockImplementation(async (_path, transform) => {
       capturedTransform = transform;
+      return true;
     });
 
     const view = controller.createInlineTableView({
@@ -314,6 +338,7 @@ describe("TableViewController", () => {
     let capturedTransform: ((content: string) => string) | null = null;
     vi.spyOn(syncService, "syncInlineTable").mockImplementation(async (_path, transform) => {
       capturedTransform = transform;
+      return true;
     });
 
     const view = controller.createInlineTableView({
@@ -330,6 +355,323 @@ describe("TableViewController", () => {
 
     await view.actions.onColumnCalculationChange(1, "none");
     expect(capturedTransform!(withSum)).not.toContain(":sum");
+  });
+
+  it("should isolate column widths and sort rules between files with identical tables (#23 / #24 / #25.3)", async () => {
+    const raw = "| Task | Status |\n| --- | --- |\n| Alpha | Todo |\n| Beta | Done |";
+    const tableA = parseMarkdownTables(raw)[0];
+    const tableB = parseMarkdownTables(raw)[0];
+
+    const viewA = controller.createInlineTableView({
+      sourcePath: "notes/a.md",
+      tableData: tableA,
+      startLine: 0,
+      tableIndex: 0,
+    });
+    const viewB = controller.createInlineTableView({
+      sourcePath: "notes/b.md",
+      tableData: tableB,
+      startLine: 0,
+      tableIndex: 0,
+    });
+
+    expect(viewA.tableData.id).not.toBe(viewB.tableData.id);
+
+    await viewA.actions.onColumnResize?.({ 0: 260 });
+    viewA.actions.onSortChange([{ column: "Task", columnIndex: 0, direction: "desc" }]);
+    await new Promise((r) => setTimeout(r, 0));
+
+    const rebuiltA = controller.createInlineTableView({
+      sourcePath: "notes/a.md",
+      tableData: parseMarkdownTables(raw)[0],
+      startLine: 0,
+      tableIndex: 0,
+    });
+    const rebuiltB = controller.createInlineTableView({
+      sourcePath: "notes/b.md",
+      tableData: parseMarkdownTables(raw)[0],
+      startLine: 0,
+      tableIndex: 0,
+    });
+
+    expect(rebuiltA.columns[0].width).toBe(260);
+    expect(rebuiltA.filterState.sortRules).toEqual([
+      { column: "Task", columnIndex: 0, direction: "desc" },
+    ]);
+    expect(rebuiltB.columns[0].width).toBeUndefined();
+    expect(rebuiltB.filterState.sortRules).toEqual([]);
+  });
+
+  it("should persist tableSortRules across fresh TableStateManager and clear on unsort", async () => {
+    const raw = "| Task | Count |\n| --- | --- |\n| B | 2 |\n| A | 1 |";
+    const view = controller.createInlineTableView({
+      sourcePath: "notes/sort.md",
+      tableData: parseMarkdownTables(raw)[0],
+      startLine: 2,
+      tableIndex: 0,
+    });
+
+    view.actions.onSortChange([{ column: "Task", columnIndex: 0, direction: "asc" }]);
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(settingsService.getSettings().tableSortRules?.[view.tableData.id]).toEqual([
+      { column: "Task", columnIndex: 0, direction: "asc" },
+    ]);
+
+    // Simulate Obsidian restart: fresh TableStateManager, settings kept.
+    const freshController = new TableViewController(
+      app,
+      settingsService,
+      new TableStateManager(),
+      syncService
+    );
+    const restored = freshController.createInlineTableView({
+      sourcePath: "notes/sort.md",
+      tableData: parseMarkdownTables(`${raw}\n| C | 3 |`)[0],
+      startLine: 8,
+      tableIndex: 0,
+    });
+
+    expect(restored.tableData.id).toBe(view.tableData.id);
+    expect(restored.filterState.sortRules).toEqual([
+      { column: "Task", columnIndex: 0, direction: "asc" },
+    ]);
+
+    restored.actions.onSortChange([]);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(settingsService.getSettings().tableSortRules?.[view.tableData.id]).toBeUndefined();
+  });
+
+  it("should rebindTableId to the mounted occurrence and load its widths and sort rules", async () => {
+    const raw = "| Task | Status |\n| --- | --- |\n| Item | Todo |";
+    const firstId = buildStableTableId({
+      sourcePath: "notes/multi.md",
+      headers: ["Task", "Status"],
+      occurrence: 0,
+    });
+    const secondId = buildStableTableId({
+      sourcePath: "notes/multi.md",
+      headers: ["Task", "Status"],
+      occurrence: 1,
+    });
+
+    await settingsService.updateSettings({
+      tableColumnWidths: { [secondId]: { 1: 195 } },
+      tableSortRules: { [secondId]: [{ column: "Task", columnIndex: 0, direction: "desc" }] },
+    });
+
+    const view = controller.createCodeBlockView({
+      sourcePath: "notes/multi.md",
+      tableData: parseMarkdownTables(raw)[0],
+      initialSource: raw,
+    });
+    expect(view.tableData.id).toBe(firstId);
+    expect(view.columns[1].width).toBeUndefined();
+    expect(view.filterState.sortRules).toEqual([]);
+
+    controller.rebindTableId(view, secondId);
+
+    expect(view.tableData.id).toBe(secondId);
+    expect(view.columns[1].width).toBe(195);
+    expect(view.filterState.sortRules).toEqual([
+      { column: "Task", columnIndex: 0, direction: "desc" },
+    ]);
+  });
+
+  it("should migrate table widths, group orders, and sort rules when a column is renamed", async () => {
+    const raw = "| Task | Status |\n| --- | --- |\n| Alpha | Todo |\n| Beta | Done |";
+    vi.mocked(vaultService.modifyFile).mockImplementation(async (_path, transform) => {
+      transform(raw);
+      return true;
+    });
+
+    const view = controller.createInlineTableView({
+      sourcePath: "notes/rename.md",
+      tableData: parseMarkdownTables(raw)[0],
+      startLine: 0,
+      tableIndex: 0,
+    });
+    const oldId = view.tableData.id;
+
+    await view.actions.onColumnResize?.({ 1: 210 });
+    view.actions.onSortChange([{ column: "Task", columnIndex: 0, direction: "asc" }]);
+    await new Promise((r) => setTimeout(r, 0));
+
+    await view.actions.onRenameColumn(1, "Stage");
+    await new Promise((r) => setTimeout(r, 0));
+
+    const newId = view.tableData.id;
+    expect(newId).not.toBe(oldId);
+
+    const latest = settingsService.getSettings();
+    expect(latest.tableColumnWidths[oldId]).toBeUndefined();
+    expect(latest.tableColumnWidths[newId]).toEqual({ 1: 210 });
+    expect(latest.tableSortRules?.[oldId]).toBeUndefined();
+    expect(latest.tableSortRules?.[newId]).toEqual([
+      { column: "Task", columnIndex: 0, direction: "asc" },
+    ]);
+    expect(latest.tableBoardGroupOrders?.[oldId]).toBeUndefined();
+    expect(latest.tableBoardGroupOrders?.[newId]).toBeDefined();
+  });
+
+  it.each(["inline", "code block"] as const)("restores 0.1.2 layout settings for an %s table", async (mode) => {
+    const sourcePath = "notes/legacy.md";
+    const raw = "| Task | Status [select] |\n| --- | --- |\n| Item | Done |";
+    const tableData = parseMarkdownTables(raw)[0];
+    const legacyId = mode === "inline" ? `tbl_${sourcePath}_0` : tableData.id;
+    const stableId = buildStableTableId({ sourcePath, headers: tableData.headers });
+    await settingsService.updateSettings({
+      tableColumnWidths: { [legacyId]: { 0: 244 }, [stableId]: { 1: 198 } },
+      tableBoardGroupOrders: { [legacyId]: { 1: ["Todo", "Done"] } },
+    });
+
+    const open = () => mode === "inline"
+      ? openInline(raw, sourcePath)
+      : controller.createCodeBlockView({
+        sourcePath, tableData: { ...tableData, id: stableId }, initialSource: raw, legacyTableId: legacyId,
+      });
+    const existing = open();
+    expect(existing.columns[1].width).toBe(198);
+    expect(existing.columns[1].uniqueTags?.map((tag) => tag.name)).toEqual(["Todo", "Done"]);
+    await settingsService.updateSettings({ tableColumnWidths: { [legacyId]: { 0: 244 } } });
+    const upgraded = open();
+    expect(upgraded.columns[0].width).toBe(244);
+    expect(settingsService.getSettings().tableColumnWidths[stableId]).toEqual({ 0: 244 });
+  });
+
+  it("migrates a late-mounted code block directly to its resolved occurrence", async () => {
+    const sourcePath = "notes/late.md";
+    const raw = "| Task |\n| --- |\n| Item |";
+    const tableData = parseMarkdownTables(raw)[0];
+    const firstId = buildStableTableId({ sourcePath, headers: tableData.headers });
+    const secondId = buildStableTableId({ sourcePath, headers: tableData.headers, occurrence: 1 });
+    await settingsService.updateSettings({ tableColumnWidths: { [tableData.id]: { 0: 161 } } });
+    const view = controller.createCodeBlockView({
+      sourcePath, tableData, initialSource: raw, resolveIdOnMount: true,
+    });
+
+    controller.rebindTableId(view, secondId);
+    expect(view.columns[0].width).toBe(161);
+    expect(settingsService.getSettings().tableColumnWidths[firstId]).toBeUndefined();
+    expect(settingsService.getSettings().tableColumnWidths[secondId]).toEqual({ 0: 161 });
+  });
+
+  it("moves both sets of matching table occurrences without overwriting widths", async () => {
+    const sourcePath = "notes/occurrences.md";
+    const markdown = ["Owner", "Person", "Owner", "Person"].map(
+      (header, i) => `| Task | ${header} |\n| --- | --- |\n| Item ${i} | Name |`
+    ).join("\n\n");
+    const note = saveNote(markdown);
+    const views = [0, 1, 2, 3].map((i) => openInline(note(), sourcePath, i));
+    for (const [i, view] of views.entries()) {
+      await view.actions.onColumnResize?.({ 0: 110 + i });
+    }
+
+    await views[1].actions.onRenameColumn(1, "Owner");
+
+    const current = findDocumentTableIdentities(note(), sourcePath);
+    expect(views.map((view) => view.tableData.id)).toEqual(current.map(({ id }) => id));
+    expect(current.map(({ id }) => settingsService.getSettings().tableColumnWidths[id]?.[0]))
+      .toEqual([110, 111, 112, 113]);
+  });
+
+  it("keeps layout and sorting attached to the same columns after add, reorder and delete", async () => {
+    const sourcePath = "notes/columns.md";
+    const note = saveNote("| Task | Owner [select] |\n| --- | --- |\n| Item | Ann |");
+    const view = openInline(note(), sourcePath);
+    await view.actions.onColumnResize?.({ 1: 244 });
+    await view.actions.onWideModeChange?.(true);
+    await view.actions.onBoardViewChange?.(false);
+    view.actions.onSortChange([{ column: "Owner", columnIndex: 1, direction: "desc" }]);
+
+    await view.actions.onAddColumn("Extra", "text", 0);
+    expect(view.filterState.sortRules[0].columnIndex).toBe(2);
+    expect(openInline(note(), sourcePath).columns[2].width).toBe(244);
+    await view.actions.onReorderColumns(2, 0);
+    expect(view.filterState.sortRules[0].columnIndex).toBe(0);
+    let reopened = openInline(note(), sourcePath);
+    expect(reopened.columns[0].width).toBe(244);
+    expect(reopened.isWideMode()).toBe(true);
+    expect(reopened.isBoardViewVisible()).toBe(false);
+    expect(settingsService.getSettings().tableBoardGroupOrders[reopened.tableData.id]).toEqual({ 0: ["Ann"] });
+
+    await view.actions.onDeleteColumn(0);
+    reopened = openInline(note(), sourcePath);
+    expect(reopened.filterState.sortRules).toEqual([]);
+    expect(reopened.columns.every((column) => column.width === undefined)).toBe(true);
+    expect(reopened.isWideMode()).toBe(true);
+  });
+
+  it("migrates settings after editing a fenced block in a mixed note", async () => {
+    const sourcePath = "notes/mixed.md";
+    const raw = "| Task | Person |\n| --- | --- |\n| Block | Ben |";
+    const note = saveNote([
+      "| Task | Owner |\n| --- | --- |\n| Inline | Ann |",
+      "```tablebase\n" + raw + "\n```",
+    ].join("\n\n"));
+    const inline = openInline(note(), sourcePath);
+    const block = controller.createCodeBlockView({
+      sourcePath, tableData: parseMarkdownTables(raw)[0], initialSource: raw, getLineStart: () => 4,
+    });
+    await inline.actions.onColumnResize?.({ 0: 185 });
+    await block.actions.onColumnResize?.({ 0: 225 });
+
+    await block.actions.onRenameColumn(1, "Owner");
+
+    const current = findDocumentTableIdentities(note(), sourcePath);
+    expect(block.tableData.id).toBe(current[1].id);
+    expect(settingsService.getSettings().tableColumnWidths).toEqual({
+      [current[0].id]: { 0: 185 },
+      [current[1].id]: { 0: 225 },
+    });
+  });
+
+  it("leaves the schema and preferences in place when the Markdown write fails", async () => {
+    const sourcePath = "notes/failed.md";
+    const raw = "| Task | Owner |\n| --- | --- |\n| Item | Ann |";
+    const view = openInline(raw, sourcePath);
+    const oldId = view.tableData.id;
+    await view.actions.onColumnResize?.({ 1: 244 });
+    vi.mocked(vaultService.modifyFile).mockImplementation(async (_path, transform) => {
+      transform(raw);
+      return false;
+    });
+
+    await view.actions.onRenameColumn(1, "Person");
+
+    expect(view.tableData.id).toBe(oldId);
+    expect(view.tableData.headers).toEqual(["Task", "Owner"]);
+    expect(view.columns[1].name).toBe("Owner");
+    expect(settingsService.getSettings().tableColumnWidths).toEqual({ [oldId]: { 1: 244 } });
+  });
+
+  it("should re-render sorted table when a checkbox cell is toggled", async () => {
+    const raw = "| Task | Done |\n| --- | --- |\n| First | [ ] |\n| Second | [ ] |";
+    vi.spyOn(syncService, "syncInlineTable").mockResolvedValue(true);
+
+    const view = controller.createInlineTableView({
+      sourcePath: "notes/checks.md",
+      tableData: parseMarkdownTables(raw)[0],
+      startLine: 0,
+      tableIndex: 0,
+    });
+
+    view.actions.onSortChange([{ column: "Done", columnIndex: 1, direction: "desc" }]);
+    const el = view.getElement();
+    document.body.appendChild(el);
+
+    const checkboxes = el.querySelectorAll<HTMLInputElement>("input[type='checkbox']");
+    expect(checkboxes).toHaveLength(2);
+    checkboxes[1].checked = true;
+    checkboxes[1].dispatchEvent(new Event("change", { bubbles: true }));
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    const renderedTitles = Array.from(
+      el.querySelectorAll<HTMLElement>('tbody tr td[data-col-index="0"]')
+    ).map((td) => td.textContent?.trim());
+    // "Second" was checked (`[x]`), so sorting Done desc puts it first.
+    expect(renderedTitles[0]).toBe("Second");
   });
 
 });
