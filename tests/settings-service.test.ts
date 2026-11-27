@@ -58,6 +58,29 @@ describe("SettingsService", () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
+  it("commits overlapping settings updates in order", async () => {
+    const persisted = vi.fn();
+    let release!: () => void;
+    const waiting = new Promise<void>((resolve) => { release = resolve; });
+    const saveData = vi.fn(async (data: Record<string, unknown>) => persisted(data))
+      .mockImplementationOnce(async (data) => {
+        await waiting;
+        persisted(data);
+      });
+    const service = new SettingsService({ loadData: async () => null, saveData });
+    const first = service.updateSettings({ tableColumnWidths: { first: { 0: 220 } } });
+    const second = service.updateSettings({ tableWideModes: { first: true } });
+    await Promise.resolve();
+    expect(saveData).toHaveBeenCalledTimes(1);
+
+    release();
+    await Promise.all([first, second]);
+    expect(persisted).toHaveBeenLastCalledWith(expect.objectContaining({
+      tableColumnWidths: { first: { 0: 220 } },
+      tableWideModes: { first: true },
+    }));
+  });
+
   it("should add, update, and remove custom tag colors with lowercased keys", async () => {
     const storage = createMockStorage();
     const service = new SettingsService(storage);

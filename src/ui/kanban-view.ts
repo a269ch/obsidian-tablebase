@@ -3,7 +3,7 @@ import { resolveTagColor } from "../core/color-palette";
 import { formatDateByOption, parseAnyDate } from "../core/date-utils";
 import { evaluateFilterStateOnRow } from "../core/filter-engine";
 import { isCellChecked } from "../core/sort-engine";
-import { parseCellTags, formatTagsToCell } from "../core/tag-parser";
+import { parseCellTags, parseCellTagTokens, formatTagsToCell } from "../core/tag-parser";
 import {
   DatabaseViewType,
   MarkdownTableData,
@@ -179,8 +179,13 @@ export class KanbanView {
     if (this.options.filterState) {
       this.options.filterState.isWideMode = next;
     }
+    const restoreFocus = this.containerEl.ownerDocument.activeElement ===
+      this.containerEl.querySelector(".ms-wide-mode-btn");
     this.containerEl.classList.toggle("is-wide-mode", next);
     this.render();
+    if (restoreFocus) {
+      this.containerEl.querySelector<HTMLButtonElement>(".ms-wide-mode-btn")?.focus({ preventScroll: true });
+    }
   }
 
   private getVisibleRows(): MarkdownTableRow[] {
@@ -452,7 +457,7 @@ export class KanbanView {
       onExternalClick: (url, e) => {
         e.stopPropagation();
         if (typeof window !== "undefined" && url) {
-          window.open(url, "_blank");
+          window.open(url, "_blank", "noopener,noreferrer");
         }
       },
       onInternalClick: (path, e) => {
@@ -517,23 +522,19 @@ export class KanbanView {
     }
 
     const row = this.options.tableData.rows.find((candidate) => candidate.rowIndex === rowIndex);
-    const rawValue = stripCodeSpans(row?.cells[this.groupByColIndex] ?? "").trim();
-    const currentTags = parseCellTags(rawValue, this.options.settings.customTagColors);
-    const fallbackFormat = this.options.settings.defaultTagFormat ?? "hashtag";
-    const format = this.detectCellTagFormat(rawValue, fallbackFormat);
-
-    const filteredNames = currentTags
-      .filter((tag) => {
-        if (!sourceGroup || sourceGroup === NO_STATUS_KEY) return true;
-        return tag.name.toLowerCase() !== sourceGroup.toLowerCase();
-      })
-      .map((tag) => tag.name);
-
-    const hasTarget = filteredNames.some(
-      (name) => name.toLowerCase() === targetGroup.toLowerCase()
+    const rawValue = row?.cells[this.groupByColIndex] ?? "";
+    const currentTags = parseCellTagTokens(rawValue);
+    const remainingTags = currentTags.filter(
+      ({ name }) => stripCodeSpans(name).toLowerCase() !== sourceGroup?.toLowerCase()
     );
-    const nextNames = hasTarget ? filteredNames : [...filteredNames, targetGroup];
-    return formatTagsToCell(nextNames, format);
+    const fallbackFormat = this.options.settings.defaultTagFormat ?? "hashtag";
+    const format = this.detectCellTagFormat(rawValue, remainingTags.length ? "comma" : fallbackFormat);
+    const hasTarget = remainingTags.some(
+      ({ name }) => stripCodeSpans(name).toLowerCase() === targetGroup.toLowerCase()
+    );
+    const sources = remainingTags.map(({ source }) => source);
+    if (!hasTarget) sources.push(formatTagsToCell([targetGroup], format));
+    return sources.join(format === "hashtag" ? " " : ", ");
   }
 
   private startTitleEdit(titleEl: HTMLElement, row: MarkdownTableRow): void {
@@ -794,7 +795,7 @@ export class KanbanView {
       onExternalClick: (url, e) => {
         e.stopPropagation();
         if (typeof window !== "undefined" && url) {
-          window.open(url, "_blank");
+          window.open(url, "_blank", "noopener,noreferrer");
         }
       },
       onInternalClick: (path, e) => {

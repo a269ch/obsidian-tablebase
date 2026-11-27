@@ -42,7 +42,7 @@ function createTestHarness(initialData: Record<string, unknown> | null = null) {
     };
   };
 
-  return { settingsService, syncService, createController, reload };
+  return { settingsService, syncService, createController, reload, savedSettings: () => savedData };
 }
 
 function clickPropertiesOption(containerEl: HTMLElement, optionLabel: string): void {
@@ -125,6 +125,9 @@ describe("Board view visibility in Properties and Settings", () => {
     expect(harness.settingsService.getSettings().tableBoardViews).toEqual({
       [viewA.tableData.id]: false,
     });
+    await vi.waitFor(() => expect(harness.savedSettings()?.tableBoardViews).toEqual({
+      [viewA.tableData.id]: false,
+    }));
 
     // Reload Obsidian with fresh SettingsService & TableStateManager.
     const reloaded = await harness.reload();
@@ -217,10 +220,12 @@ describe("Board view visibility in Properties and Settings", () => {
   it("should migrate tableBoardViews when a column is renamed", async () => {
     const harness = createTestHarness();
     await harness.settingsService.loadSettings();
-    vi.spyOn(harness.syncService, "syncInlineTable").mockResolvedValue(undefined);
-
     const controller = harness.createController();
     const raw = "| Task | Status |\n| --- | --- |\n| Alpha | Todo |";
+    vi.spyOn(harness.syncService, "syncInlineTable").mockImplementation(async (_path, transform) => {
+      transform(raw);
+      return true;
+    });
     const view = controller.createInlineTableView({
       sourcePath: "notes/rename-board.md",
       tableData: parseMarkdownTables(raw)[0],

@@ -220,7 +220,7 @@ export class CellRenderer {
           e.stopPropagation();
           this.focusCell(row.rowIndex, colIndex);
           if (typeof window !== "undefined" && url) {
-            window.open(url, "_blank");
+            window.open(url, "_blank", "noopener,noreferrer");
           }
         },
         onInternalClick: (path, e) => {

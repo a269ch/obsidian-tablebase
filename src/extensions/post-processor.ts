@@ -162,7 +162,7 @@ export class TablePostProcessor {
     const tableData: MarkdownTableData = {
       id: buildStableTableId({
         sourcePath: ctx.sourcePath,
-        headers: reconciledHeaders,
+        headers: source?.headers ?? reconciledHeaders,
         occurrence,
       }),
       headers: reconciledHeaders,

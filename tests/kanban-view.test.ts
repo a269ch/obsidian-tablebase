@@ -348,7 +348,7 @@ describe("KanbanView", () => {
     expect(linkEl?.getAttribute("href")).toBe("https://github.com");
 
     linkEl?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(windowOpenSpy).toHaveBeenCalledWith("https://github.com", "_blank");
+    expect(windowOpenSpy).toHaveBeenCalledWith("https://github.com", "_blank", "noopener,noreferrer");
 
     windowOpenSpy.mockRestore();
   });
@@ -541,7 +541,10 @@ describe("KanbanView", () => {
     expect(workCardTags).toEqual(["urgent"]);
   });
 
-  it("should preserve other tags when dragging a multi-select card between columns (#26)", async () => {
+  it.each([
+    ["hashtag", "#work #urgent", "#work", "#urgent #personal"],
+    ["wikilink", "[[work]], [[urgent\\|Priority, high]]", "[[work]]", "[[urgent\\|Priority, high]], [[personal]]"],
+  ] as const)("keeps other %s tags intact when moving a card (#26)", async (format, alphaTags, betaTags, updated) => {
     const columns: TableColumn[] = [
       { index: 0, name: "Task", type: "text" },
       {
@@ -563,8 +566,8 @@ describe("KanbanView", () => {
       headers: ["Task", "Tags"],
       alignments: ["---", "---"],
       rows: [
-        { rowIndex: 0, cells: ["Alpha", "#work #urgent"], rawLine: "| Alpha | #work #urgent |" },
-        { rowIndex: 1, cells: ["Beta", "#work"], rawLine: "| Beta | #work |" },
+        { rowIndex: 0, cells: ["Alpha", alphaTags], rawLine: `| Alpha | ${alphaTags} |` },
+        { rowIndex: 1, cells: ["Beta", betaTags], rawLine: `| Beta | ${betaTags} |` },
       ],
     };
 
@@ -575,7 +578,7 @@ describe("KanbanView", () => {
       tableData,
       columns,
       filterState: { ...defaultFilterState, groupByColumnIndex: 1 },
-      settings: { ...DEFAULT_SETTINGS, defaultTagFormat: "hashtag" },
+      settings: { ...DEFAULT_SETTINGS, defaultTagFormat: format },
       actions,
       onSwitchView: vi.fn(),
     });
@@ -605,7 +608,7 @@ describe("KanbanView", () => {
     personalList?.dispatchEvent(dropPersonal);
     await new Promise((r) => setTimeout(r, 0));
 
-    expect(actions.onCellUpdate).toHaveBeenLastCalledWith(0, 1, "#urgent #personal");
+    expect(actions.onCellUpdate).toHaveBeenLastCalledWith(0, 1, updated);
 
     // Drag Alpha within "work" onto Beta: reorders without stripping "#urgent".
     vi.clearAllMocks();

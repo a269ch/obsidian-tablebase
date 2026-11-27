@@ -240,6 +240,9 @@ export class NotionTableView implements Disposable, TableViewContext {
   public render(): void {
     if (this.disposed) return;
 
+    const wideModeButton = this.containerEl.querySelector(".ms-wide-mode-btn");
+    const restoreWideModeFocus =
+      wideModeButton && this.containerEl.ownerDocument.activeElement === wideModeButton;
     this.menus.closeActivePopover();
     this.containerEl.empty();
     this.wideMode.sync(this.isWideMode());
@@ -250,9 +253,16 @@ export class NotionTableView implements Disposable, TableViewContext {
 
     if (this.filterState.viewType === "board") {
       this.renderBoard();
-      return;
+    } else {
+      this.renderTable();
     }
 
+    if (restoreWideModeFocus) {
+      this.containerEl.querySelector<HTMLButtonElement>(".ms-wide-mode-btn")?.focus({ preventScroll: true });
+    }
+  }
+
+  private renderTable(): void {
     this.toolbar.render(this.containerEl);
 
     if (this.filterState.isSortOpen) {

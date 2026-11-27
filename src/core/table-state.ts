@@ -210,6 +210,19 @@ export class TableStateManager {
     this.filterStates.set(tableId, state);
   }
 
+  public rekeyFilterStates(changes: ReadonlyMap<string, string | undefined>): void {
+    const states = Array.from(changes, ([from, to]) => ({ from, to, state: this.filterStates.get(from) }));
+    for (const { from, to } of states) {
+      this.filterStates.delete(from);
+      if (to) this.filterStates.delete(to);
+    }
+    for (const { to, state } of states) {
+      if (!to || !state) continue;
+      state.tableId = to;
+      this.filterStates.set(to, state);
+    }
+  }
+
   public clearFilterState(tableId: string): void {
     const state = this.getOrCreateFilterState(tableId);
     state.rules = [];

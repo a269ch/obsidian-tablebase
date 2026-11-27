@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { App } from "obsidian";
 import { parseMarkdownTables, serializeMarkdownTable } from "../src/core/markdown-parser";
+import { buildStableTableId, findDocumentTableIdentities } from "../src/core/table-id";
 import { TableStateManager } from "../src/core/table-state";
 import { SettingsService } from "../src/services/settings-service";
 import { TableSyncService } from "../src/services/table-sync-service";
@@ -40,6 +41,26 @@ describe("TableViewController", () => {
     syncService = new TableSyncService(vaultService);
     controller = new TableViewController(app, settingsService, stateManager, syncService);
   });
+
+  function saveNote(initial: string): () => string {
+    let markdown = initial;
+    vi.mocked(vaultService.modifyFile).mockImplementation(async (_path, transform) => {
+      markdown = transform(markdown);
+      return true;
+    });
+    return () => markdown;
+  }
+
+  function openInline(markdown: string, sourcePath: string, index = 0): ReturnType<TableViewController["createInlineTableView"]> {
+    const tableData = parseMarkdownTables(markdown)[index];
+    const identity = findDocumentTableIdentities(markdown, sourcePath).find(
+      ({ sortLine }) => sortLine === tableData.startLine
+    );
+    tableData.id = identity!.id;
+    return controller.createInlineTableView({
+      sourcePath, tableData, startLine: tableData.startLine, tableIndex: index,
+    });
+  }
 
   it("should create code block view and sync on table modification", async () => {
     const raw = "| Col A | Col B |\n| --- | --- |\n| 1 | 2 |";
@@ -107,6 +128,7 @@ describe("TableViewController", () => {
       leaf.appendChild(replacement);
       replacement.scrollTop = 0;
       replacement.scrollLeft = 0;
+      return true;
     });
 
     const tableData = parseMarkdownTables(
@@ -200,6 +222,7 @@ describe("TableViewController", () => {
     let capturedTransform: ((content: string) => string) | null = null;
     vi.spyOn(syncService, "syncInlineTable").mockImplementation(async (_path, transform) => {
       capturedTransform = transform;
+      return true;
     });
 
     const view = controller.createInlineTableView({
@@ -258,6 +281,7 @@ describe("TableViewController", () => {
     let capturedTransform: ((content: string) => string) | null = null;
     vi.spyOn(syncService, "syncInlineTable").mockImplementation(async (_path, transform) => {
       capturedTransform = transform;
+      return true;
     });
 
     const view = controller.createInlineTableView({
@@ -314,6 +338,7 @@ describe("TableViewController", () => {
     let capturedTransform: ((content: string) => string) | null = null;
     vi.spyOn(syncService, "syncInlineTable").mockImplementation(async (_path, transform) => {
       capturedTransform = transform;
+      return true;
     });
 
     const view = controller.createInlineTableView({
@@ -419,7 +444,6 @@ describe("TableViewController", () => {
 
   it("should rebindTableId to the mounted occurrence and load its widths and sort rules", async () => {
     const raw = "| Task | Status |\n| --- | --- |\n| Item | Todo |";
-    const { buildStableTableId } = await import("../src/core/table-id");
     const firstId = buildStableTableId({
       sourcePath: "notes/multi.md",
       headers: ["Task", "Status"],
@@ -456,7 +480,10 @@ describe("TableViewController", () => {
 
   it("should migrate table widths, group orders, and sort rules when a column is renamed", async () => {
     const raw = "| Task | Status |\n| --- | --- |\n| Alpha | Todo |\n| Beta | Done |";
-    vi.spyOn(syncService, "syncInlineTable").mockResolvedValue(undefined);
+    vi.mocked(vaultService.modifyFile).mockImplementation(async (_path, transform) => {
+      transform(raw);
+      return true;
+    });
 
     const view = controller.createInlineTableView({
       sourcePath: "notes/rename.md",
@@ -487,9 +514,140 @@ describe("TableViewController", () => {
     expect(latest.tableBoardGroupOrders?.[newId]).toBeDefined();
   });
 
+  it.each(["inline", "code block"] as const)("restores 0.1.2 layout settings for an %s table", async (mode) => {
+    const sourcePath = "notes/legacy.md";
+    const raw = "| Task | Status [select] |\n| --- | --- |\n| Item | Done |";
+    const tableData = parseMarkdownTables(raw)[0];
+    const legacyId = mode === "inline" ? `tbl_${sourcePath}_0` : tableData.id;
+    const stableId = buildStableTableId({ sourcePath, headers: tableData.headers });
+    await settingsService.updateSettings({
+      tableColumnWidths: { [legacyId]: { 0: 244 }, [stableId]: { 1: 198 } },
+      tableBoardGroupOrders: { [legacyId]: { 1: ["Todo", "Done"] } },
+    });
+
+    const open = () => mode === "inline"
+      ? openInline(raw, sourcePath)
+      : controller.createCodeBlockView({
+        sourcePath, tableData: { ...tableData, id: stableId }, initialSource: raw, legacyTableId: legacyId,
+      });
+    const existing = open();
+    expect(existing.columns[1].width).toBe(198);
+    expect(existing.columns[1].uniqueTags?.map((tag) => tag.name)).toEqual(["Todo", "Done"]);
+    await settingsService.updateSettings({ tableColumnWidths: { [legacyId]: { 0: 244 } } });
+    const upgraded = open();
+    expect(upgraded.columns[0].width).toBe(244);
+    expect(settingsService.getSettings().tableColumnWidths[stableId]).toEqual({ 0: 244 });
+  });
+
+  it("migrates a late-mounted code block directly to its resolved occurrence", async () => {
+    const sourcePath = "notes/late.md";
+    const raw = "| Task |\n| --- |\n| Item |";
+    const tableData = parseMarkdownTables(raw)[0];
+    const firstId = buildStableTableId({ sourcePath, headers: tableData.headers });
+    const secondId = buildStableTableId({ sourcePath, headers: tableData.headers, occurrence: 1 });
+    await settingsService.updateSettings({ tableColumnWidths: { [tableData.id]: { 0: 161 } } });
+    const view = controller.createCodeBlockView({
+      sourcePath, tableData, initialSource: raw, resolveIdOnMount: true,
+    });
+
+    controller.rebindTableId(view, secondId);
+    expect(view.columns[0].width).toBe(161);
+    expect(settingsService.getSettings().tableColumnWidths[firstId]).toBeUndefined();
+    expect(settingsService.getSettings().tableColumnWidths[secondId]).toEqual({ 0: 161 });
+  });
+
+  it("moves both sets of matching table occurrences without overwriting widths", async () => {
+    const sourcePath = "notes/occurrences.md";
+    const markdown = ["Owner", "Person", "Owner", "Person"].map(
+      (header, i) => `| Task | ${header} |\n| --- | --- |\n| Item ${i} | Name |`
+    ).join("\n\n");
+    const note = saveNote(markdown);
+    const views = [0, 1, 2, 3].map((i) => openInline(note(), sourcePath, i));
+    for (const [i, view] of views.entries()) {
+      await view.actions.onColumnResize?.({ 0: 110 + i });
+    }
+
+    await views[1].actions.onRenameColumn(1, "Owner");
+
+    const current = findDocumentTableIdentities(note(), sourcePath);
+    expect(views.map((view) => view.tableData.id)).toEqual(current.map(({ id }) => id));
+    expect(current.map(({ id }) => settingsService.getSettings().tableColumnWidths[id]?.[0]))
+      .toEqual([110, 111, 112, 113]);
+  });
+
+  it("keeps layout and sorting attached to the same columns after add, reorder and delete", async () => {
+    const sourcePath = "notes/columns.md";
+    const note = saveNote("| Task | Owner [select] |\n| --- | --- |\n| Item | Ann |");
+    const view = openInline(note(), sourcePath);
+    await view.actions.onColumnResize?.({ 1: 244 });
+    await view.actions.onWideModeChange?.(true);
+    await view.actions.onBoardViewChange?.(false);
+    view.actions.onSortChange([{ column: "Owner", columnIndex: 1, direction: "desc" }]);
+
+    await view.actions.onAddColumn("Extra", "text", 0);
+    expect(view.filterState.sortRules[0].columnIndex).toBe(2);
+    expect(openInline(note(), sourcePath).columns[2].width).toBe(244);
+    await view.actions.onReorderColumns(2, 0);
+    expect(view.filterState.sortRules[0].columnIndex).toBe(0);
+    let reopened = openInline(note(), sourcePath);
+    expect(reopened.columns[0].width).toBe(244);
+    expect(reopened.isWideMode()).toBe(true);
+    expect(reopened.isBoardViewVisible()).toBe(false);
+    expect(settingsService.getSettings().tableBoardGroupOrders[reopened.tableData.id]).toEqual({ 0: ["Ann"] });
+
+    await view.actions.onDeleteColumn(0);
+    reopened = openInline(note(), sourcePath);
+    expect(reopened.filterState.sortRules).toEqual([]);
+    expect(reopened.columns.every((column) => column.width === undefined)).toBe(true);
+    expect(reopened.isWideMode()).toBe(true);
+  });
+
+  it("migrates settings after editing a fenced block in a mixed note", async () => {
+    const sourcePath = "notes/mixed.md";
+    const raw = "| Task | Person |\n| --- | --- |\n| Block | Ben |";
+    const note = saveNote([
+      "| Task | Owner |\n| --- | --- |\n| Inline | Ann |",
+      "```tablebase\n" + raw + "\n```",
+    ].join("\n\n"));
+    const inline = openInline(note(), sourcePath);
+    const block = controller.createCodeBlockView({
+      sourcePath, tableData: parseMarkdownTables(raw)[0], initialSource: raw, getLineStart: () => 4,
+    });
+    await inline.actions.onColumnResize?.({ 0: 185 });
+    await block.actions.onColumnResize?.({ 0: 225 });
+
+    await block.actions.onRenameColumn(1, "Owner");
+
+    const current = findDocumentTableIdentities(note(), sourcePath);
+    expect(block.tableData.id).toBe(current[1].id);
+    expect(settingsService.getSettings().tableColumnWidths).toEqual({
+      [current[0].id]: { 0: 185 },
+      [current[1].id]: { 0: 225 },
+    });
+  });
+
+  it("leaves the schema and preferences in place when the Markdown write fails", async () => {
+    const sourcePath = "notes/failed.md";
+    const raw = "| Task | Owner |\n| --- | --- |\n| Item | Ann |";
+    const view = openInline(raw, sourcePath);
+    const oldId = view.tableData.id;
+    await view.actions.onColumnResize?.({ 1: 244 });
+    vi.mocked(vaultService.modifyFile).mockImplementation(async (_path, transform) => {
+      transform(raw);
+      return false;
+    });
+
+    await view.actions.onRenameColumn(1, "Person");
+
+    expect(view.tableData.id).toBe(oldId);
+    expect(view.tableData.headers).toEqual(["Task", "Owner"]);
+    expect(view.columns[1].name).toBe("Owner");
+    expect(settingsService.getSettings().tableColumnWidths).toEqual({ [oldId]: { 1: 244 } });
+  });
+
   it("should re-render sorted table when a checkbox cell is toggled", async () => {
     const raw = "| Task | Done |\n| --- | --- |\n| First | [ ] |\n| Second | [ ] |";
-    vi.spyOn(syncService, "syncInlineTable").mockResolvedValue(undefined);
+    vi.spyOn(syncService, "syncInlineTable").mockResolvedValue(true);
 
     const view = controller.createInlineTableView({
       sourcePath: "notes/checks.md",

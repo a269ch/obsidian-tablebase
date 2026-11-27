@@ -5,7 +5,9 @@ import {
   changeColumnAlignmentInDocument,
   deleteColumnFromDocument,
   deleteRowFromDocument,
+  findTargetTable,
   mutateTableInDocument,
+  parseMarkdownTables,
   renameColumnInDocument,
   reorderColumnInDocument,
   reorderRowInDocument,
@@ -29,9 +31,8 @@ import {
 } from "../core/table-mutator";
 import {
   buildStableTableId,
+  findDocumentTableIdentities,
   isStableTableId,
-  normalizeTableHeaderSignature,
-  parseOccurrenceFromTableId,
 } from "../core/table-id";
 import { TableStateManager } from "../core/table-state";
 import {
@@ -47,13 +48,15 @@ import {
 import { NotionTableView } from "../ui/table/table-view";
 import { TableViewActions } from "../ui/table/types";
 import { SettingsService } from "./settings-service";
-import { TableSyncService } from "./table-sync-service";
+import { CodeBlockRewrite, TableSyncService } from "./table-sync-service";
 
 export interface CodeBlockViewParams {
   sourcePath: string;
   tableData: MarkdownTableData;
   initialSource: string;
   getLineStart?: () => number | undefined;
+  legacyTableId?: string;
+  resolveIdOnMount?: boolean;
 }
 
 export interface InlineTableViewParams {
@@ -83,8 +86,14 @@ export type TableOperation =
 
 type PersistOperation = (
   operation: TableOperation,
-  previousHeaders: string[]
-) => Promise<void>;
+  previousHeaders: string[],
+  onRewrite?: CodeBlockRewrite
+) => Promise<boolean>;
+
+interface TableIdChange {
+  from: string;
+  to?: string;
+}
 
 export class TableViewController {
   private app: App;
@@ -93,7 +102,12 @@ export class TableViewController {
   private syncService: TableSyncService;
   private editorScroll: Map<string, { top: number; left: number }> = new Map();
   private editorScrollObservers: Map<string, MutationObserver> = new Map();
-  private rebindHandlers = new WeakMap<NotionTableView, (newTableId: string) => void>();
+  private pendingCommits = new Map<string, Promise<void>>();
+  private viewsByPath = new Map<string, Set<NotionTableView>>();
+  private rebindHandlers = new WeakMap<
+    NotionTableView,
+    (newTableId: string, refresh?: boolean, replacement?: MarkdownTableData) => void
+  >();
 
   constructor(
     app: App,
@@ -109,6 +123,7 @@ export class TableViewController {
 
   public createCodeBlockView(params: CodeBlockViewParams): NotionTableView {
     const { sourcePath, tableData } = params;
+    const legacyId = params.legacyTableId ?? (!isStableTableId(tableData.id) ? tableData.id : undefined);
     if (!isStableTableId(tableData.id)) {
       tableData.id = buildStableTableId({
         sourcePath,
@@ -117,29 +132,25 @@ export class TableViewController {
       });
     }
     let currentSource = params.initialSource;
-    let pendingSave: Promise<void> = Promise.resolve();
-
-    // Saves run one at a time so each finds the block as the previous one left it.
-    const persist: PersistOperation = () => {
-      const save = pendingSave.then(async () => {
-        const written = serializeMarkdownTable(tableData);
-        const saved = await this.syncService.syncCodeBlock(
-          sourcePath,
-          tableData,
-          currentSource,
-          params.getLineStart?.()
-        );
-        if (!saved) {
-          new Notice("TableBase: could not find this table in the note, so the change was not saved.");
-          return;
-        }
+    const persist: PersistOperation = async (_operation, _previousHeaders, onRewrite) => {
+      const written = serializeMarkdownTable(tableData);
+      const args = [sourcePath, tableData, currentSource, params.getLineStart?.()] as const;
+      const saved = onRewrite
+        ? await this.syncService.syncCodeBlock(...args, onRewrite)
+        : await this.syncService.syncCodeBlock(...args);
+      if (saved) {
         currentSource = written;
-      });
-      pendingSave = save.catch(() => undefined);
-      return save;
+      } else {
+        new Notice("TableBase: could not find this table in the note, so the change was not saved.");
+      }
+      return saved;
     };
 
-    return this.createView(tableData, persist, sourcePath);
+    return this.createView(tableData, persist, sourcePath, {
+      legacyId,
+      resolveIdOnMount: params.resolveIdOnMount,
+      updateBlockSource: (source) => { currentSource = source; },
+    });
   }
 
   public createInlineTableView(params: InlineTableViewParams): NotionTableView {
@@ -152,7 +163,7 @@ export class TableViewController {
       });
     }
 
-    const persist: PersistOperation = async (operation, previousHeaders) => {
+    const persist: PersistOperation = (operation, previousHeaders, onRewrite) => {
       const transform = createDocumentTransform(
         operation,
         previousHeaders,
@@ -160,14 +171,20 @@ export class TableViewController {
         startLine,
         tableIndex
       );
-      await this.syncService.syncInlineTable(sourcePath, transform);
+      return this.syncService.syncInlineTable(sourcePath, onRewrite ? (content) => {
+        const target = findTargetTable(parseMarkdownTables(content), startLine, previousHeaders, tableIndex);
+        const next = transform(content);
+        if (target) onRewrite(content, next, target.startLine);
+        return next;
+      } : transform);
     };
 
-    return this.createView(tableData, persist, sourcePath);
+    const legacyId = `tbl_${sourcePath || "doc"}_${tableIndex}`;
+    return this.createView(tableData, persist, sourcePath, { legacyId });
   }
 
   public rebindTableId(view: NotionTableView, newTableId: string): void {
-    if (!newTableId || view.tableData.id === newTableId) return;
+    if (!newTableId) return;
     const handler = this.rebindHandlers.get(view);
     handler?.(newTableId);
   }
@@ -175,7 +192,7 @@ export class TableViewController {
   private prepareColumns(
     tableData: MarkdownTableData,
     settings: PluginSettings,
-    onSyncGroupOrders: (patch: Partial<PluginSettings>) => Promise<void>
+    onSyncGroupOrders?: (patch: Partial<PluginSettings>) => Promise<void>
   ): TableColumn[] {
     const columns = this.stateManager.analyzeColumns(tableData, settings);
     const savedGroupOrders = settings.tableBoardGroupOrders?.[tableData.id] ?? {};
@@ -204,7 +221,7 @@ export class TableViewController {
     }
 
     if (JSON.stringify(savedGroupOrders) !== JSON.stringify(tableGroupOrders)) {
-      void onSyncGroupOrders({
+      void onSyncGroupOrders?.({
         tableBoardGroupOrders: {
           ...(settings.tableBoardGroupOrders ?? {}),
           [tableData.id]: tableGroupOrders,
@@ -239,38 +256,41 @@ export class TableViewController {
     return filterState;
   }
 
-  private async migrateTableSettings(
-    oldId: string,
-    newId: string,
-    filterState: TableFilterState,
+  private readTableSettings(
+    tableId: string,
+    legacyId: string | undefined,
     updateSettings: (patch: Partial<PluginSettings>) => Promise<void>
-  ): Promise<void> {
-    this.stateManager.setFilterState(newId, filterState);
+  ): PluginSettings {
+    const settings = this.settingsService.getSettings();
+    if (!legacyId?.startsWith("tbl_")) return settings;
 
-    const latestSettings = this.settingsService.getSettings();
     const patch: Partial<PluginSettings> = {};
-
-    const perTableKeys = [
-      "tableColumnWidths",
-      "tableBoardGroupOrders",
-      "tableSortRules",
-      "tableWideModes",
-      "tableBoardViews",
-    ] as const;
-    for (const key of perTableKeys) {
-      moveTableSettingKey(patch, latestSettings, key, oldId, newId);
+    for (const key of ["tableColumnWidths", "tableBoardGroupOrders"] as const) {
+      const values = settings[key];
+      if (values?.[legacyId] !== undefined && values[tableId] === undefined) {
+        // Legacy IDs could be shared. Keep them available to other tables using that key.
+        Object.assign(patch, { [key]: { ...values, [tableId]: values[legacyId] } });
+      }
     }
 
     if (Object.keys(patch).length > 0) {
-      await updateSettings(patch);
+      void updateSettings(patch);
     }
+    return this.settingsService.getSettings();
   }
 
   private createView(
     tableData: MarkdownTableData,
     persist: PersistOperation,
-    sourcePath: string
+    sourcePath: string,
+    binding: {
+      legacyId?: string;
+      resolveIdOnMount?: boolean;
+      updateBlockSource?: (source: string) => void;
+    }
   ): NotionTableView {
+    const { legacyId, updateBlockSource } = binding;
+    let { resolveIdOnMount } = binding;
     const silentSnapshots = new WeakSet<PluginSettings>();
 
     const updateSettingsSilently = async (patch: Partial<PluginSettings>): Promise<void> => {
@@ -279,39 +299,75 @@ export class TableViewController {
       await savePromise;
     };
 
-    const settings = this.settingsService.getSettings();
-    let columns = this.prepareColumns(tableData, settings, updateSettingsSilently);
+    const settings = this.readTableSettings(
+      tableData.id, resolveIdOnMount ? undefined : legacyId, updateSettingsSilently
+    );
+    let columns = this.prepareColumns(
+      tableData, settings, resolveIdOnMount ? undefined : updateSettingsSilently
+    );
     let filterState = this.prepareFilterState(tableData.id, columns.length, settings);
 
     let view: NotionTableView | null = null;
 
-    const commit = async (
+    const persistChange = async (
       mutate: () => TableOperation | null,
-      options: { refresh?: boolean } = {}
+      options: { refresh?: boolean; columnEdit?: boolean }
     ): Promise<void> => {
       this.captureEditorScroll(sourcePath);
       this.watchEditorScroll(sourcePath);
       const previousHeaders = [...tableData.headers];
+      const previousColumns = options.columnEdit ? [...columns] : [];
+      const previousSettings = this.settingsService.getSettings();
+      const previousViews = options.columnEdit
+        ? new Map(Array.from(this.viewsByPath.get(sourcePath) ?? [], (openView) => [openView, openView.tableData.id]))
+        : undefined;
+      const backup = options.columnEdit ? {
+        columns: columns.map((column) => ({ ...column })),
+        data: copyTableData(tableData),
+      } : undefined;
       const operation = mutate();
       if (!operation) return;
 
-      await persist(operation, previousHeaders);
-      if (
-        operation.kind === "rename-column" &&
-        isStableTableId(tableData.id) &&
-        normalizeTableHeaderSignature(previousHeaders) !==
-          normalizeTableHeaderSignature(tableData.headers)
-      ) {
-        const oldId = tableData.id;
-        const newId = buildStableTableId({
-          sourcePath,
-          headers: tableData.headers,
-          occurrence: parseOccurrenceFromTableId(oldId),
-        });
-        if (newId !== oldId) {
-          tableData.id = newId;
-          await this.migrateTableSettings(oldId, newId, filterState, updateSettingsSilently);
+      let changes: ReturnType<typeof findTableIdChanges>;
+      const saved = await persist(operation, previousHeaders, options.columnEdit ? (before, after, line) => {
+        changes = findTableIdChanges(sourcePath, before, after, line, Boolean(updateBlockSource), tableData.id);
+      } : undefined);
+      if (backup && saved === false) {
+        Object.assign(tableData, backup.data);
+        columns = backup.columns;
+      } else if (saved && changes) {
+        const indices = new Map(columns.map((column) => [column, column.index]));
+        const newIndices = previousColumns.map((column) => indices.get(column));
+        const newId = changes.edited.to;
+        if (newId) tableData.id = newId;
+        this.stateManager.rekeyFilterStates(new Map(changes.moves.map(({ from, to }) => [from, to])));
+        if (newId) {
+          updateColumnState(filterState, newIndices, columns);
+          filterState.tableId = newId;
+          this.stateManager.setFilterState(newId, filterState);
         }
+        const patch = migrateTableSettings(
+          previousSettings, this.settingsService.getSettings(), changes, newIndices, columns
+        );
+        const savedSettings = Object.keys(patch).length ? updateSettingsSilently(patch) : undefined;
+        const moved = new Map(changes.moves.map(({ from, to }) => [from, to]));
+        const destinations = new Set(moved.values());
+        if (newId) destinations.add(newId);
+        for (const openView of this.viewsByPath.get(sourcePath) ?? []) {
+          if (openView === view) continue;
+          const oldId = previousViews?.get(openView);
+          if (oldId === changes.edited.from && newId) {
+            this.rebindHandlers.get(openView)?.(newId, true, tableData);
+          } else if (oldId) {
+            const destination = moved.get(oldId);
+            if (destination) this.rebindTableId(openView, destination);
+          } else if (!oldId && destinations.has(openView.tableData.id)) {
+            this.rebindHandlers.get(openView)?.(openView.tableData.id, true);
+          }
+        }
+        view?.syncSettings(this.settingsService.getSettings());
+        view?.rebindState(tableData, columns, filterState);
+        await savedSettings;
       }
       this.restoreEditorScroll(sourcePath);
       if (typeof window !== "undefined") {
@@ -327,9 +383,25 @@ export class TableViewController {
         window.requestAnimationFrame(restoreForSeveralFrames);
       }
 
-      if (options.refresh !== false) {
+      if (options.refresh !== false && !(saved && changes)) {
         view?.updateData(tableData, columns);
       }
+    };
+
+    // Keep each note's write and settings migration in the same queue.
+    const commit = (
+      mutate: () => TableOperation | null,
+      options: { refresh?: boolean; columnEdit?: boolean } = {}
+    ): Promise<void> => {
+      const pending = this.pendingCommits.get(sourcePath);
+      const run = () => persistChange(mutate, options);
+      const save = pending ? pending.then(run, run) : run();
+      this.pendingCommits.set(sourcePath, save);
+      const cleanup = () => {
+        if (this.pendingCommits.get(sourcePath) === save) this.pendingCommits.delete(sourcePath);
+      };
+      void save.then(cleanup, cleanup);
+      return save;
     };
 
     const headerAt = (colIndex: number): string => tableData.headers[colIndex] ?? "";
@@ -371,22 +443,23 @@ export class TableViewController {
         commit(() => {
           const effectiveDateFormat =
             dateFormat ?? this.settingsService.getSettings().dateFormat;
-          applyAddColumn(tableData, columns, name, type, atIndex, effectiveDateFormat);
-          const colIndex = atIndex ?? tableData.headers.length - 1;
-          return { kind: "add-column", headerText: headerAt(colIndex), atIndex };
-        }),
+          const { index: colIndex } = applyAddColumn(
+            tableData, columns, name, type, atIndex, effectiveDateFormat
+          );
+          return { kind: "add-column", headerText: headerAt(colIndex), atIndex: colIndex };
+        }, { columnEdit: true }),
 
       onRenameColumn: (colIndex, newName) =>
         commit(() => {
           applyRenameColumn(tableData, columns, colIndex, newName);
           return { kind: "rename-column", colIndex, headerText: headerAt(colIndex) };
-        }),
+        }, { columnEdit: true }),
 
       onDeleteColumn: (colIndex) =>
         commit(() => {
           applyDeleteColumn(tableData, columns, colIndex);
           return { kind: "delete-column", colIndex };
-        }),
+        }, { columnEdit: true }),
 
       onColumnTypeChange: (colIndex, newType, dateFormat) =>
         commit(() => {
@@ -433,7 +506,7 @@ export class TableViewController {
         commit(() => {
           applyReorderColumns(tableData, columns, fromIndex, toIndex);
           return { kind: "reorder-columns", fromIndex, toIndex };
-        }),
+        }, { columnEdit: true }),
 
       onFilterChange: (newState) => {
         filterState = newState;
@@ -504,10 +577,17 @@ export class TableViewController {
       actions,
     });
 
-    this.rebindHandlers.set(view, (newTableId: string) => {
-      if (!view || tableData.id === newTableId) return;
+    this.rebindHandlers.set(view, (newTableId: string, refresh = false, replacement) => {
+      if (!view || (tableData.id === newTableId && !resolveIdOnMount && !refresh)) return;
+      const latestSettings = this.readTableSettings(
+        newTableId, resolveIdOnMount ? legacyId : undefined, updateSettingsSilently
+      );
+      resolveIdOnMount = false;
+      if (replacement) {
+        Object.assign(tableData, copyTableData(replacement));
+        updateBlockSource?.(serializeMarkdownTable(tableData));
+      }
       tableData.id = newTableId;
-      const latestSettings = this.settingsService.getSettings();
       columns = this.prepareColumns(tableData, latestSettings, updateSettingsSilently);
       filterState = this.prepareFilterState(newTableId, columns.length, latestSettings);
       view.syncSettings(latestSettings);
@@ -522,6 +602,14 @@ export class TableViewController {
       view?.updateSettings(updatedSettings);
     });
     view.registry.addFn(unsubscribe);
+    const openViews = this.viewsByPath.get(sourcePath) ?? new Set<NotionTableView>();
+    this.viewsByPath.set(sourcePath, openViews);
+    const registeredView = view;
+    openViews.add(registeredView);
+    view.registry.addFn(() => {
+      openViews.delete(registeredView);
+      if (openViews.size === 0) this.viewsByPath.delete(sourcePath);
+    });
 
     return view;
   }
@@ -717,24 +805,118 @@ function createDocumentTransform(
   }
 }
 
-type PerTableSettingKey =
-  | "tableColumnWidths"
-  | "tableBoardGroupOrders"
-  | "tableSortRules"
-  | "tableWideModes"
-  | "tableBoardViews";
+function copyTableData(table: MarkdownTableData): MarkdownTableData {
+  return {
+    ...table,
+    headers: [...table.headers],
+    alignments: [...table.alignments],
+    rows: table.rows.map((row) => ({ ...row, cells: [...row.cells] })),
+  };
+}
 
-/** Moves a per-table settings entry from oldId to newId when present. */
-function moveTableSettingKey<K extends PerTableSettingKey>(
-  patch: Partial<PluginSettings>,
-  settings: PluginSettings,
-  key: K,
-  oldId: string,
-  newId: string
+function findTableIdChanges(
+  sourcePath: string,
+  before: string,
+  after: string,
+  line: number,
+  isCodeBlock: boolean,
+  viewId: string
+): { edited: TableIdChange; moves: TableIdChange[] } | undefined {
+  const oldTables = findDocumentTableIdentities(before, sourcePath);
+  const newTables = findDocumentTableIdentities(after, sourcePath);
+  const oldTable = oldTables.find((table) => table.sortLine === line && table.isCodeBlock === isCodeBlock);
+  if (!oldTable) return;
+
+  // Only the edited table's span can change. Keep matching its neighbors by line.
+  const lineDelta = after.split("\n").length - before.split("\n").length;
+  const byLine = new Map(newTables.map((table) => [table.sortLine, table]));
+  const edited: TableIdChange = { from: oldTable.id, to: byLine.get(line)?.id };
+  if (viewId !== oldTable.id && !oldTables.some((table) => table.id === viewId)) {
+    edited.from = viewId;
+  }
+  const moves = oldTables.map((table) => table === oldTable ? edited : {
+    from: table.id,
+    to: byLine.get(table.sortLine + (table.sortLine > line ? lineDelta : 0))?.id,
+  }).filter(({ from, to }) => from !== to);
+  return { edited, moves };
+}
+
+type ColumnIndices = (number | undefined)[];
+
+function remapRules<T extends { columnIndex: number; column: string }>(
+  rules: T[],
+  indices: ColumnIndices,
+  columns: TableColumn[]
+): T[] {
+  return rules.flatMap((rule) => {
+    const index = indices[rule.columnIndex];
+    return index === undefined ? [] : [{ ...rule, columnIndex: index, column: columns[index].name }];
+  });
+}
+
+function remapColumnValues<T>(values: Record<string, T>, indices: ColumnIndices): Record<string, T> {
+  return Object.fromEntries(Object.entries(values).flatMap(([oldIndex, value]) => {
+    const index = indices[Number(oldIndex)];
+    return index === undefined ? [] : [[String(index), value]];
+  }));
+}
+
+function updateColumnState(
+  state: TableFilterState,
+  indices: ColumnIndices,
+  columns: TableColumn[]
 ): void {
-  const map = settings[key] as Record<string, unknown> | undefined;
-  if (!map || map[oldId] === undefined) return;
-  const next = { ...map, [newId]: map[oldId] };
-  delete next[oldId];
-  patch[key] = next as PluginSettings[K];
+  state.sortRules = remapRules(state.sortRules, indices, columns);
+  state.rules = remapRules(state.rules, indices, columns);
+  state.hiddenColumnIndices = state.hiddenColumnIndices?.flatMap((index) => indices[index] ?? []);
+  if (state.groupByColumnIndex !== undefined) {
+    state.groupByColumnIndex = indices[state.groupByColumnIndex];
+  }
+  if (state.selection?.col !== undefined) {
+    const col = indices[state.selection.col];
+    state.selection = col === undefined ? undefined : { ...state.selection, col };
+  }
+}
+
+function migrateTableSettings(
+  previous: PluginSettings,
+  latest: PluginSettings,
+  changes: { edited: TableIdChange; moves: TableIdChange[] },
+  indices: ColumnIndices,
+  columns: TableColumn[]
+): Partial<PluginSettings> {
+  const patch: Partial<PluginSettings> = {};
+  const keys = [
+    "tableColumnWidths", "tableBoardGroupOrders", "tableSortRules", "tableWideModes", "tableBoardViews",
+  ] as const;
+  const { edited, moves } = changes;
+  const transfers = edited.from === edited.to ? [...moves, edited] : moves;
+
+  for (const key of keys) {
+    const next: Record<string, unknown> = { ...latest[key] };
+    // Read all sources from the snapshot, then assign their destinations. An
+    // occurrence that shifts into a vacated key must never inherit its value.
+    for (const { from } of transfers) delete next[from];
+    for (const { from, to } of transfers) {
+      if (!to) continue;
+      delete next[to];
+      if (from !== edited.from) {
+        const value = previous[key]?.[from];
+        if (value !== undefined) next[to] = value;
+      } else if (key === "tableColumnWidths" || key === "tableBoardGroupOrders") {
+        const value = previous[key]?.[from] as Record<string, unknown> | undefined;
+        if (value !== undefined) next[to] = remapColumnValues(value, indices);
+      } else if (key === "tableSortRules") {
+        const rules = previous[key]?.[from];
+        if (rules !== undefined) next[to] = remapRules(rules, indices, columns);
+      } else {
+        const value = previous[key]?.[from];
+        if (value !== undefined) next[to] = value;
+      }
+    }
+    if (JSON.stringify(next) !== JSON.stringify(latest[key] ?? {})) {
+      Object.assign(patch, { [key]: next });
+    }
+  }
+  return patch;
 }
