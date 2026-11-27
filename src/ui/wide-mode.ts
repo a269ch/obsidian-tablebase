@@ -8,8 +8,10 @@ const WIDE_MODE_HOST_ANCESTOR_SELECTOR =
   ".el-table, .table-wrapper, .el-pre, .cm-embed-block, .cm-preview-code-block";
 const WIDE_MODE_HOST_CLASS = "ms-wide-mode-host";
 const WIDE_MODE_CLASS = "is-wide-mode";
+const WIDE_MODE_AVAILABLE = "data-ms-wide-available";
 const MIN_LEFT_GUTTER_PX = 28;
 const MIN_RIGHT_GUTTER_PX = 20;
+const MIN_WIDTH_GAIN_PX = 48;
 
 function isResizeObserverCtor(value: unknown): value is typeof ResizeObserver {
   return typeof value === "function";
@@ -62,18 +64,12 @@ export class WideModeController implements Disposable {
   }
 
   public sync(isWide: boolean): void {
-    this.layoutRegistry.disposeAll();
     this.containerEl.classList.toggle(WIDE_MODE_CLASS, isWide);
-
-    if (!isWide) {
-      this.clearHostClass();
-      this.clearCustomProperties();
-      return;
-    }
-
-    this.syncHostClass();
     this.updateLayout();
 
+    if (this.layoutRegistry.size > 0) return;
+
+    // The first render can run before Obsidian inserts the table into the note.
     let cancelled = false;
     this.layoutRegistry.addFn(() => {
       cancelled = true;
@@ -82,7 +78,6 @@ export class WideModeController implements Disposable {
     if (typeof queueMicrotask === "function") {
       queueMicrotask(() => {
         if (cancelled) return;
-        this.syncHostClass();
         this.updateLayout();
       });
     }
@@ -91,7 +86,8 @@ export class WideModeController implements Disposable {
     if (win) {
       this.layoutRegistry.listen(win, "resize", () => this.updateLayout());
       if (typeof win.requestAnimationFrame === "function") {
-        this.layoutRegistry.animationFrame(() => this.attachObservers());
+        const frame = win.requestAnimationFrame(() => this.attachObservers());
+        this.layoutRegistry.addFn(() => win.cancelAnimationFrame(frame));
       }
     }
   }
@@ -99,6 +95,7 @@ export class WideModeController implements Disposable {
   public dispose(): void {
     this.layoutRegistry.disposeAll();
     this.containerEl.classList.remove(WIDE_MODE_CLASS);
+    this.containerEl.removeAttribute(WIDE_MODE_AVAILABLE);
     this.clearHostClass();
     this.clearCustomProperties();
   }
@@ -124,7 +121,7 @@ export class WideModeController implements Disposable {
   }
 
   private removeHostClassIfUnused(el: HTMLElement): void {
-    if (!el.querySelector(`.${WIDE_MODE_CLASS}`)) {
+    if (!el.querySelector(`.${WIDE_MODE_CLASS}[${WIDE_MODE_AVAILABLE}]`)) {
       el.classList.remove(WIDE_MODE_HOST_CLASS);
     }
   }
@@ -143,9 +140,6 @@ export class WideModeController implements Disposable {
   }
 
   private clearHostClass(): void {
-    if (this.containerEl.parentElement) {
-      this.removeHostClassIfUnused(this.containerEl.parentElement);
-    }
     for (const host of this.hostEls) {
       this.removeHostClassIfUnused(host);
     }
@@ -164,42 +158,39 @@ export class WideModeController implements Disposable {
   }
 
   private attachObservers(): void {
-    this.syncHostClass();
     this.updateLayout();
 
     const hostEl = this.containerEl.parentElement;
     const pageEl = this.containerEl.closest<HTMLElement>(WIDE_MODE_PAGE_SELECTOR);
     const ObserverCtor = getResizeObserver(this.getWindow());
 
-    if (!ObserverCtor || (!hostEl && !pageEl)) return;
+    if (!ObserverCtor || !this.containerEl.isConnected || !hostEl || !pageEl) return;
 
     const observer = new ObserverCtor(() => {
       this.updateLayout();
     });
-    if (pageEl) observer.observe(pageEl);
-    if (hostEl) observer.observe(hostEl);
+    observer.observe(pageEl);
+    if (hostEl !== pageEl) observer.observe(hostEl);
     this.layoutRegistry.addFn(() => observer.disconnect());
   }
 
   private updateLayout(): void {
-    this.syncHostClass();
-
     const hostEl = this.containerEl.parentElement;
     const win = this.getWindow();
     if (!hostEl || !win || !this.containerEl.isConnected) {
-      this.clearCustomProperties();
+      this.setAvailable(false);
       return;
     }
 
     const pageEl = this.containerEl.closest<HTMLElement>(WIDE_MODE_PAGE_SELECTOR);
     if (!pageEl || pageEl.clientWidth <= 0) {
-      this.clearCustomProperties();
+      this.setAvailable(false);
       return;
     }
 
     const hostRect = hostEl.getBoundingClientRect();
     if (hostRect.width <= 0) {
-      this.clearCustomProperties();
+      this.setAvailable(false);
       return;
     }
 
@@ -228,16 +219,16 @@ export class WideModeController implements Disposable {
 
     const maxRight = paneVisibleRight - Math.max(panePadRight, MIN_RIGHT_GUTTER_PX);
     const targetWidth = Math.floor(maxRight - minLeft);
-    if (targetWidth <= 0) {
-      this.clearCustomProperties();
-      return;
-    }
+    const hostLeftInset = (parseFloat(hostStyle.borderLeftWidth) || 0) + (parseFloat(hostStyle.paddingLeft) || 0);
+    const hostRightInset = (parseFloat(hostStyle.borderRightWidth) || 0) + (parseFloat(hostStyle.paddingRight) || 0);
+    const narrowInset = parseFloat(win.getComputedStyle(this.containerEl).getPropertyValue("--ms-narrow-inset")) || 0;
+    const narrowWidth = hostRect.width - hostLeftInset - hostRightInset - narrowInset;
+    const canExpand = narrowWidth > 0 && targetWidth - narrowWidth >= MIN_WIDTH_GAIN_PX;
+    this.setAvailable(canExpand);
+    if (!canExpand || !this.containerEl.classList.contains(WIDE_MODE_CLASS)) return;
 
-    const hostContentLeft =
-      hostRect.left +
-      (parseFloat(hostStyle.borderLeftWidth) || 0) +
-      (parseFloat(hostStyle.paddingLeft) || 0) +
-      pageEl.scrollLeft;
+    this.syncHostClass();
+    const hostContentLeft = hostRect.left + hostLeftInset + pageEl.scrollLeft;
     const offsetLeft = Math.round(minLeft - hostContentLeft);
 
     const nextWidthProp = `${targetWidth}px`;
@@ -250,6 +241,19 @@ export class WideModeController implements Disposable {
     if (this.lastOffsetProp !== nextOffsetProp) {
       this.containerEl.style.setProperty("--ms-wide-offset-left", nextOffsetProp);
       this.lastOffsetProp = nextOffsetProp;
+    }
+  }
+
+  private setAvailable(available: boolean): void {
+    const hideFocusedButton = !available && this.containerEl.hasAttribute(WIDE_MODE_AVAILABLE) &&
+      this.containerEl.querySelector(".ms-wide-mode-btn") === this.containerEl.ownerDocument.activeElement;
+    this.containerEl.toggleAttribute(WIDE_MODE_AVAILABLE, available);
+    if (hideFocusedButton) {
+      this.containerEl.focus({ preventScroll: true });
+    }
+    if (!available || !this.containerEl.classList.contains(WIDE_MODE_CLASS)) {
+      this.clearHostClass();
+      this.clearCustomProperties();
     }
   }
 }
