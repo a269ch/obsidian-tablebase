@@ -292,7 +292,7 @@ describe("CellRenderer date cells", () => {
     expect(extLinks[1].textContent).toBe("https://google.com");
 
     extLinks[0].dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(windowOpenSpy).toHaveBeenCalledWith("https://obsidian.md", "_blank");
+    expect(windowOpenSpy).toHaveBeenCalledWith("https://obsidian.md", "_blank", "noopener,noreferrer");
 
     const intLink = td.querySelector<HTMLAnchorElement>("a.internal-link");
     expect(intLink).not.toBeNull();

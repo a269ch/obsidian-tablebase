@@ -33,7 +33,7 @@ export function createWideModeToggleButton(
     title,
     attr: {
       type: "button",
-      "aria-label": title,
+      "aria-label": "Wide mode",
       "aria-pressed": isWide ? "true" : "false",
       "data-wide-mode": isWide ? "true" : "false",
     },

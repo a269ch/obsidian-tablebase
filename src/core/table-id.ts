@@ -53,18 +53,17 @@ interface DocumentTableEntry {
   isCodeBlock: boolean;
 }
 
-/**
- * Computes the zero-based occurrence index of a table among all tables in the
- * document sharing the same normalized header signature. Keeping the count by
- * header signature rather than raw line numbers ensures adding rows or editing
- * surrounding text never invalidates a table's identity.
- */
-export function findTableOccurrenceInDocument(
-  docContent: string,
-  options: { startLine: number; isCodeBlock: boolean }
-): number {
-  if (!docContent || options.startLine < 0) return 0;
+interface DocumentTableIdentity {
+  sortLine: number;
+  isCodeBlock: boolean;
+  occurrence: number;
+  id: string;
+}
 
+export function findDocumentTableIdentities(
+  docContent: string,
+  sourcePath?: string
+): DocumentTableIdentity[] {
   const lines = docContent.split(/\r?\n/);
   const fencedBlocks = findFencedBlocks(lines);
   const entries: DocumentTableEntry[] = [];
@@ -98,17 +97,27 @@ export function findTableOccurrenceInDocument(
 
   entries.sort((a, b) => a.sortLine - b.sortLine);
 
-  const targetIndex = entries.findIndex(
-    (entry) => entry.isCodeBlock === options.isCodeBlock && entry.sortLine === options.startLine
-  );
-  if (targetIndex === -1) return 0;
+  const counts = new Map<string, number>();
+  const path = sourcePath || "doc";
+  return entries.map(({ sortLine, isCodeBlock, headerSig }) => {
+    const occurrence = counts.get(headerSig) ?? 0;
+    counts.set(headerSig, occurrence + 1);
+    return {
+      sortLine,
+      isCodeBlock,
+      occurrence,
+      id: `${STABLE_TABLE_ID_PREFIX}${path}:${hashHeaderSignature(headerSig)}:${occurrence}`,
+    };
+  });
+}
 
-  const targetSig = entries[targetIndex].headerSig;
-  let occurrence = 0;
-  for (let i = 0; i < targetIndex; i++) {
-    if (entries[i].headerSig === targetSig) {
-      occurrence++;
-    }
-  }
-  return occurrence;
+/** The zero-based position among tables sharing this table's normalized headers. */
+export function findTableOccurrenceInDocument(
+  docContent: string,
+  options: { startLine: number; isCodeBlock: boolean }
+): number {
+  if (!docContent || options.startLine < 0) return 0;
+  return findDocumentTableIdentities(docContent).find(
+    (entry) => entry.isCodeBlock === options.isCodeBlock && entry.sortLine === options.startLine
+  )?.occurrence ?? 0;
 }

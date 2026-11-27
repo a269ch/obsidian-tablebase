@@ -2,6 +2,38 @@ import { TagColor, MultiSelectTag, TagFormat } from "../types";
 import { parseLinkTokens } from "../utils/link-renderer";
 import { resolveTagColor } from "./color-palette";
 
+interface CellTagToken {
+  name: string;
+  source: string;
+}
+
+function parseWikiTagTokens(text: string): CellTagToken[] {
+  return Array.from(
+    text.matchAll(/\[\[([^\]|]+?)(?:\\?\|[^\]]+)?\]\]/g),
+    ([source, target]) => ({ name: target.trim(), source })
+  ).filter((tag) => tag.name);
+}
+
+export function parseCellTagTokens(cellContent: string): CellTagToken[] {
+  const trimmed = cellContent.trim();
+  if (!trimmed || trimmed === "-" || trimmed === "N/A" || trimmed === "null") return [];
+
+  const wikiTags = parseWikiTagTokens(trimmed);
+  if (wikiTags.length > 0) return wikiTags;
+
+  if (/(?:^|\s)#[\p{L}\p{N}_-]/u.test(trimmed)) {
+    return Array.from(trimmed.matchAll(/#([\p{L}\p{N}_-]+)/gu), ([source, name]) => ({
+      name,
+      source,
+    }));
+  }
+
+  return trimmed.split(/[,;]/).flatMap((part) => {
+    const name = part.trim();
+    return name ? [{ name, source: name }] : [];
+  });
+}
+
 export function parseCellTags(
   cellContent: string,
   customColors?: Record<string, TagColor>
@@ -10,48 +42,10 @@ export function parseCellTags(
     return [];
   }
 
-  const trimmed = cellContent.trim();
-  if (trimmed === "" || trimmed === "-" || trimmed === "N/A" || trimmed === "null") {
-    return [];
-  }
-
-  const rawTags: string[] = [];
-
-  if (trimmed.includes("[[") && trimmed.includes("]]")) {
-    const wikilinkRegex = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g;
-    let match: RegExpExecArray | null;
-    while ((match = wikilinkRegex.exec(trimmed)) !== null) {
-      const target = match[1]?.replace(/\\$/, "").trim();
-      if (target) {
-        rawTags.push(target);
-      }
-    }
-  }
-
-  if (rawTags.length === 0 && (trimmed.startsWith("#") || /\s#[a-zA-Z0-9_\-\u0400-\u04FF]/.test(trimmed))) {
-    const hashtagRegex = /#([\p{L}\p{N}_-]+)/gu;
-    let match: RegExpExecArray | null;
-    while ((match = hashtagRegex.exec(trimmed)) !== null) {
-      if (match[1] && match[1].trim()) {
-        rawTags.push(match[1].trim());
-      }
-    }
-  }
-
-  if (rawTags.length === 0) {
-    const parts = trimmed.split(/[,;]/);
-    for (const part of parts) {
-      const clean = part.trim();
-      if (clean) {
-        rawTags.push(clean);
-      }
-    }
-  }
-
   const seen = new Set<string>();
   const uniqueTags: MultiSelectTag[] = [];
 
-  for (const rawName of rawTags) {
+  for (const { name: rawName } of parseCellTagTokens(cellContent)) {
     const lower = rawName.toLowerCase();
     if (!seen.has(lower)) {
       seen.add(lower);
@@ -134,10 +128,6 @@ function isLikelyMultiSelectCell(rawValue: string): boolean {
   const linkCount = tokens.filter(
     (token) => token.type === "internal" || token.type === "external"
   ).length;
-  if (linkCount > 1) {
-    return true;
-  }
-
   const plainText = tokens
     .filter((token) => token.type === "text")
     .map((token) => token.text)
@@ -148,8 +138,10 @@ function isLikelyMultiSelectCell(rawValue: string): boolean {
     return true;
   }
 
-  // Commas or punctuation inside a single link alias/label do not denote tags.
-  if (linkCount === 1 || !plainText || NUMERIC_THOUSANDS_REGEX.test(plainText)) {
+  if (linkCount > 0) {
+    return linkCount > 1 && parseWikiTagTokens(trimmed).length === linkCount;
+  }
+  if (!plainText || NUMERIC_THOUSANDS_REGEX.test(plainText)) {
     return false;
   }
 

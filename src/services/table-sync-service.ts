@@ -7,6 +7,8 @@ import {
 import { MarkdownTableData } from "../types";
 import { VaultService } from "./vault-service";
 
+export type CodeBlockRewrite = (previous: string, next: string, line: number) => void;
+
 // A table block at the hinted line must match; otherwise the only match wins. Anything ambiguous returns undefined.
 function pickBlock(
   blocks: FencedBlock[],
@@ -38,7 +40,8 @@ export class TableSyncService {
     sourcePath: string,
     tableData: MarkdownTableData,
     initialSource?: string,
-    lineHint?: number
+    lineHint?: number,
+    onRewrite?: CodeBlockRewrite
   ): Promise<boolean> {
     if (!sourcePath) return false;
 
@@ -65,7 +68,9 @@ export class TableSyncService {
       });
       lines.splice(block.openLine + 1, block.closeLine - block.openLine - 1, ...bodyLines);
       replaced = true;
-      return lines.join("\n");
+      const next = lines.join("\n");
+      onRewrite?.(content, next, block.openLine);
+      return next;
     };
 
     const modified = await this.vaultService.modifyFile(sourcePath, transform);
@@ -75,8 +80,7 @@ export class TableSyncService {
   public async syncInlineTable(
     sourcePath: string,
     transform: (content: string) => string
-  ): Promise<void> {
-    if (!sourcePath) return;
-    await this.vaultService.modifyFile(sourcePath, transform);
+  ): Promise<boolean> {
+    return Boolean(sourcePath) && this.vaultService.modifyFile(sourcePath, transform);
   }
 }

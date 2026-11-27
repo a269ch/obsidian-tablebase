@@ -49,6 +49,22 @@ describe("link-renderer", () => {
     ]);
   });
 
+  it.each([
+    "javascript:blocked", "DATA:text/plain,data", "file:///some/path",
+    "unsupported-scheme:example", "//example.org/path", "%6Aavascript%3Ablocked",
+    "obsidian://unrecognized-handler",
+  ])("renders a disallowed Markdown destination as plain text (%s)", (destination) => {
+    const container = document.createElement("div");
+    const onExternalClick = vi.fn();
+    const onInternalClick = vi.fn();
+    renderTextWithLinks(container, `[Example](${destination})`, { onExternalClick, onInternalClick });
+
+    expect(container.textContent).toBe("Example");
+    expect(container.querySelector("a")).toBeNull();
+    expect(onExternalClick).not.toHaveBeenCalled();
+    expect(onInternalClick).not.toHaveBeenCalled();
+  });
+
   it("should parse obsidian internal wiki links with and without alias", () => {
     const tokens = parseLinkTokens("Check [[Project Plan]] and [[Meeting Notes|notes from Monday]].");
     expect(tokens).toEqual([

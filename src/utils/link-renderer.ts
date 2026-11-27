@@ -110,9 +110,21 @@ export function stripCodeSpans(input: string): string {
 }
 
 const LINK_PATTERN =
-  /(\[(?<mdLabel>[^\]\r\n]+)\]\((?<mdUrl><[^>\r\n]+>|(?:[^\s()\r\n]|\([^\s()\r\n]*\))+)\))|(\[\[(?<wikiTarget>[^\]|\r\n]+?)(?:\\?\|(?<wikiAlias>[^\]\r\n]+))?\]\])|(?<rawUrl>https?:\/\/(?:[^\s<>[\]()"']|\([^\s<>[\]()"']*\))+)/g;
+  /(\[(?<mdLabel>[^\]\r\n]+)\]\((?<mdUrl><[^>\r\n]+>|(?:[^\s()\r\n]|\([^\s()\r\n]*\))+)\))|(\[\[(?<wikiTarget>[^\]|\r\n]+?)(?:\\?\|(?<wikiAlias>[^\]\r\n]+))?\]\])|(?<rawUrl>https?:\/\/(?:[^\s<>[\]()"']|\([^\s<>[\]()"']*\))+)/gi;
 
 const URI_SCHEME_PATTERN = /^[a-zA-Z][a-zA-Z\d+.-]*:/;
+
+function isAllowedExternalDestination(destination: string): boolean {
+  return /^(?:https?:\/\/\S+|obsidian:\/\/open(?:[?#]\S*)?)$/i.test(destination);
+}
+
+function isNoteLink(destination: string): boolean {
+  return (
+    Boolean(destination) &&
+    !URI_SCHEME_PATTERN.test(destination) &&
+    !/^[\\/]{2}|[\u0000-\u001f\u007f]/.test(destination)
+  );
+}
 
 function decodeInternalLinkPath(path: string): string {
   if (!path.includes("%")) return path;
@@ -155,17 +167,20 @@ export function parseLinkTokens(input: string): LinkToken[] {
 function appendLinkToken(tokens: LinkToken[], match: RegExpExecArray): void {
   const groups = match.groups;
   if (groups?.mdUrl) {
-    const rawDest =
+    const destination = (
       groups.mdUrl.startsWith("<") && groups.mdUrl.endsWith(">")
         ? groups.mdUrl.slice(1, -1)
-        : groups.mdUrl;
-    const isExternal = URI_SCHEME_PATTERN.test(rawDest);
-    const label = groups.mdLabel ? stripCodeSpans(groups.mdLabel) : rawDest;
-    tokens.push({
-      type: isExternal ? "external" : "internal",
-      text: label,
-      href: isExternal ? rawDest : decodeInternalLinkPath(rawDest.trim()),
-    });
+        : groups.mdUrl
+    ).trim();
+    const label = groups.mdLabel ? stripCodeSpans(groups.mdLabel) : destination;
+    const notePath = decodeInternalLinkPath(destination).trim();
+    if (isAllowedExternalDestination(destination)) {
+      tokens.push({ type: "external", text: label, href: destination });
+    } else if (isNoteLink(destination) && isNoteLink(notePath)) {
+      tokens.push({ type: "internal", text: label, href: notePath });
+    } else {
+      appendTextToken(tokens, label);
+    }
   } else if (groups?.wikiTarget) {
     const target = groups.wikiTarget.trim();
     tokens.push({
@@ -217,7 +232,7 @@ export function renderTextWithLinks(
       // A span, not `code`: plugins that act on inline code (queries, inputs)
       // must not run on cell text.
       container.createSpan({ cls: "ms-cell-code", text: token.text });
-    } else if (token.type === "external") {
+    } else if (token.type === "external" && token.href && isAllowedExternalDestination(token.href)) {
       const linkEl = container.createEl("a", {
         cls: "ms-cell-link external-link",
         text: token.text,

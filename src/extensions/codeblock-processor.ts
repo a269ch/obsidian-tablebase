@@ -48,6 +48,7 @@ export class TableCodeBlockProcessor {
       });
     };
 
+    const legacyTableId = tables[0].id;
     const resolvedAtProcess = resolveTableId();
     if (resolvedAtProcess) {
       tables[0].id = resolvedAtProcess;
@@ -58,6 +59,8 @@ export class TableCodeBlockProcessor {
       tableData: tables[0],
       initialSource: source,
       getLineStart: () => ctx.getSectionInfo?.(el)?.lineStart,
+      legacyTableId,
+      resolveIdOnMount: !resolvedAtProcess,
     });
 
     const viewEl = view.getElement();
@@ -65,10 +68,7 @@ export class TableCodeBlockProcessor {
     ctx.addChild(
       new TableRenderChild(viewEl, view, this.registry, () => {
         if (resolvedAtProcess) return;
-        const mountedId = resolveTableId();
-        if (mountedId && mountedId !== tables[0].id) {
-          this.viewController.rebindTableId?.(view, mountedId);
-        }
+        this.viewController.rebindTableId?.(view, resolveTableId() ?? view.tableData.id);
       })
     );
   }

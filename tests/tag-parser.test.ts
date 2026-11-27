@@ -99,6 +99,12 @@ describe("Tag Parser & Formatter", () => {
       expect(looksLikeMultiSelect(values, "Note")).toBe(true);
     });
 
+    it("keeps Markdown and external links out of auto-detected multi-select columns", () => {
+      expect(looksLikeMultiSelect(["[Guide](Guide.md) [Plan](Plan.md)"], "References")).toBe(false);
+      expect(looksLikeMultiSelect(["[Guide](Guide.md), [[Plan]]"], "References")).toBe(false);
+      expect(looksLikeMultiSelect(["https://example.org, https://example.com"], "References")).toBe(false);
+    });
+
     it("should return false for regular single-value columns", () => {
       const values = ["Alice", "Bob", "Charlie", "David"];
       expect(looksLikeMultiSelect(values, "Author")).toBe(false);

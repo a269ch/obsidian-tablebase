@@ -11,6 +11,7 @@ export class SettingsService {
   private settings: PluginSettings = { ...DEFAULT_SETTINGS };
   private listeners: Set<SettingsChangeListener> = new Set();
   private storage: SettingsStorage;
+  private pendingSave: Promise<void> = Promise.resolve();
 
   constructor(storage: SettingsStorage) {
     this.storage = storage;
@@ -34,7 +35,10 @@ export class SettingsService {
   }
 
   public async saveSettings(): Promise<void> {
-    await this.storage.saveData(this.settings as unknown as Record<string, unknown>);
+    const data = this.settings as unknown as Record<string, unknown>;
+    const save = this.pendingSave.then(() => this.storage.saveData(data));
+    this.pendingSave = save.catch(() => undefined);
+    await save;
     this.notifyListeners();
   }
 
@@ -50,15 +54,15 @@ export class SettingsService {
   public async setTagColor(tagName: string, color: TagColor): Promise<void> {
     const key = tagName.trim().toLowerCase();
     if (!key) return;
-    this.settings.customTagColors[key] = color;
-    await this.saveSettings();
+    await this.updateSettings({ customTagColors: { ...this.settings.customTagColors, [key]: color } });
   }
 
   public async removeTagColor(tagName: string): Promise<void> {
     const key = tagName.trim().toLowerCase();
     if (key in this.settings.customTagColors) {
-      delete this.settings.customTagColors[key];
-      await this.saveSettings();
+      const customTagColors = { ...this.settings.customTagColors };
+      delete customTagColors[key];
+      await this.updateSettings({ customTagColors });
     }
   }
 

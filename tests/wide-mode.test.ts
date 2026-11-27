@@ -191,8 +191,13 @@ describe("Wide mode toggle and layout", () => {
     const containerEl = view.getElement();
     hostEl.appendChild(containerEl);
 
-    containerEl.querySelector<HTMLButtonElement>(".ms-wide-mode-btn")?.click();
+    const tableWideButton = containerEl.querySelector<HTMLButtonElement>(".ms-wide-mode-btn")!;
+    tableWideButton.focus();
+    tableWideButton.click();
     expect(containerEl.classList.contains("is-wide-mode")).toBe(true);
+    expect(document.activeElement).toBe(containerEl.querySelector(".ms-wide-mode-btn"));
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("Wide mode");
+    expect(document.activeElement?.getAttribute("aria-pressed")).toBe("true");
 
     view.switchView("board");
     expect(containerEl.classList.contains("is-wide-mode")).toBe(true);
@@ -203,7 +208,10 @@ describe("Wide mode toggle and layout", () => {
     expect(boardWideBtn).not.toBeNull();
     expect(boardWideBtn?.classList.contains("is-active")).toBe(true);
 
+    boardWideBtn?.focus();
     boardWideBtn?.click();
+    expect(document.activeElement).toBe(containerEl.querySelector(".ms-kanban-container .ms-wide-mode-btn"));
+    expect(document.activeElement?.getAttribute("aria-pressed")).toBe("false");
     expect(view.isWideMode()).toBe(false);
     expect(containerEl.classList.contains("is-wide-mode")).toBe(false);
     expect(containerEl.querySelector(".ms-kanban-container")).not.toBeNull();
@@ -298,6 +306,7 @@ describe("Wide mode toggle and layout", () => {
     expect(settingsService.getSettings().tableWideModes).toEqual({
       [viewA.tableData.id]: true,
     });
+    await vi.waitFor(() => expect(savedData.tableWideModes).toEqual({ [viewA.tableData.id]: true }));
 
     // Simulate closing/reopening Obsidian with a brand new SettingsService & TableStateManager.
     const reloadedSettings = new SettingsService({
