@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
+import { readFileSync } from "node:fs";
 import { App } from "obsidian";
 import { parseMarkdownTables } from "../src/core/markdown-parser";
 import { TableStateManager } from "../src/core/table-state";
@@ -69,6 +70,22 @@ function mockElementRect(el: HTMLElement, rect: Partial<DOMRect>): void {
   });
 }
 
+function mockPaneWidth(pane: HTMLElement, width: number): void {
+  Object.defineProperty(pane, "clientWidth", { configurable: true, value: width });
+  mockElementRect(pane, { width });
+}
+
+function mountReadingPane(host: HTMLElement): HTMLElement {
+  const pane = document.createElement("div");
+  pane.className = "markdown-preview-view";
+  pane.style.paddingLeft = "32px";
+  pane.style.paddingRight = "32px";
+  mockPaneWidth(pane, 1200);
+  pane.appendChild(host);
+  document.body.appendChild(pane);
+  return pane;
+}
+
 describe("Wide mode toggle and layout", () => {
   beforeAll(() => {
     installObsidianDomHelpers(window as Window & typeof globalThis);
@@ -78,7 +95,7 @@ describe("Wide mode toggle and layout", () => {
     document.body.innerHTML = "";
   });
 
-  it("should toggle wide mode via toolbar button and Properties menu without altering siblings", () => {
+  it("should toggle wide mode via toolbar button and Properties menu without altering siblings", async () => {
     const tableData: MarkdownTableData = parseMarkdownTables(
       "| Task | Status |\n| --- | --- |\n| Alpha | Todo |"
     )[0];
@@ -101,8 +118,9 @@ describe("Wide mode toggle and layout", () => {
     siblingParagraph.textContent = "Original readable paragraph";
     const hostEl = document.createElement("div");
     hostEl.className = "el-table ms-enhanced-table-wrapper";
+    mockElementRect(hostEl, { left: 250, width: 700 });
     sizer.append(siblingParagraph, hostEl);
-    document.body.appendChild(sizer);
+    mountReadingPane(sizer);
 
     const view = new NotionTableView({
       app: {} as App,
@@ -116,9 +134,11 @@ describe("Wide mode toggle and layout", () => {
 
     const containerEl = view.getElement();
     hostEl.appendChild(containerEl);
+    await Promise.resolve();
 
     expect(view.isWideMode()).toBe(false);
     expect(containerEl.classList.contains("is-wide-mode")).toBe(false);
+    expect(containerEl.hasAttribute("data-ms-wide-available")).toBe(true);
     expect(hostEl.classList.contains("ms-wide-mode-host")).toBe(false);
 
     const toggleBtn = containerEl.querySelector<HTMLButtonElement>(".ms-wide-mode-btn");
@@ -159,9 +179,10 @@ describe("Wide mode toggle and layout", () => {
     expect(containerEl.classList.contains("is-wide-mode")).toBe(false);
     expect(hostEl.classList.contains("ms-wide-mode-host")).toBe(false);
     expect(onWideModeChange).toHaveBeenLastCalledWith(false);
+    view.dispose();
   });
 
-  it("should preserve and toggle wide mode across Table and Board views", () => {
+  it("should preserve and toggle wide mode across Table and Board views", async () => {
     const tableData: MarkdownTableData = parseMarkdownTables(
       "| Task | Status |\n| --- | --- |\n| Alpha | Todo |\n| Beta | Done |"
     )[0];
@@ -187,9 +208,11 @@ describe("Wide mode toggle and layout", () => {
 
     const hostEl = document.createElement("div");
     hostEl.className = "block-language-tablebase";
-    document.body.appendChild(hostEl);
+    mockElementRect(hostEl, { left: 250, width: 700 });
+    mountReadingPane(hostEl);
     const containerEl = view.getElement();
     hostEl.appendChild(containerEl);
+    await Promise.resolve();
 
     const tableWideButton = containerEl.querySelector<HTMLButtonElement>(".ms-wide-mode-btn")!;
     tableWideButton.focus();
@@ -220,6 +243,95 @@ describe("Wide mode toggle and layout", () => {
         .querySelector<HTMLButtonElement>(".ms-kanban-container .ms-wide-mode-btn")
         ?.classList.contains("is-active")
     ).toBe(false);
+    view.dispose();
+  });
+
+  it("shows the Table and Board shortcut only when layout can gain room, and keeps Properties available", async () => {
+    const style = document.createElement("style");
+    style.textContent = readFileSync("styles.css", "utf8");
+    document.head.appendChild(style);
+
+    const observed = new Map<Element, () => void>();
+    vi.stubGlobal("ResizeObserver", class {
+      private readonly targets = new Set<Element>();
+
+      constructor(private readonly callback: () => void) {}
+
+      observe(element: Element): void {
+        this.targets.add(element);
+        observed.set(element, this.callback);
+      }
+
+      disconnect(): void {
+        for (const element of this.targets) observed.delete(element);
+        this.targets.clear();
+      }
+    });
+
+    const tableData = parseMarkdownTables("| Task | Status |\n| --- | --- |\n| Alpha | Todo |")[0];
+    const view = new NotionTableView({
+      app: {} as App,
+      sourcePath: "note.md",
+      tableData,
+      columns: buildColumns(),
+      filterState: new TableStateManager().getOrCreateFilterState(tableData.id),
+      settings: { ...DEFAULT_SETTINGS },
+      actions: createActions(),
+    });
+
+    try {
+      const host = document.createElement("div");
+      mockElementRect(host, { left: 32, width: 1136 });
+      const pane = mountReadingPane(host);
+      const container = view.getElement();
+      host.appendChild(container);
+      await vi.waitFor(() => expect(observed.has(pane)).toBe(true));
+
+      const button = () => container.querySelector<HTMLButtonElement>(".ms-wide-mode-btn")!;
+      expect(getComputedStyle(button()).display).toBe("none");
+
+      const properties = Array.from(container.querySelectorAll("button")).find(
+        (item) => item.textContent?.trim() === "Properties"
+      )!;
+      mockElementRect(properties, { left: 100, top: 50, width: 80, height: 28 });
+      properties.click();
+      const option = Array.from(document.querySelectorAll<HTMLElement>(".ms-prop-toggle-item")).find(
+        (item) => item.textContent === "Wide mode"
+      );
+      expect(option).toBeDefined();
+      option?.click();
+      expect(view.isWideMode()).toBe(true);
+      expect(getComputedStyle(button()).display).toBe("none");
+      expect(container.style.getPropertyValue("--ms-wide-width")).toBe("");
+
+      mockElementRect(host, { left: 250, width: 700 });
+      observed.get(host)?.();
+      expect(container.hasAttribute("data-ms-wide-available")).toBe(true);
+      expect(getComputedStyle(button()).display).toBe("inline-flex");
+      expect(container.style.getPropertyValue("--ms-wide-width")).toBe("1136px");
+
+      view.switchView("board");
+      expect(getComputedStyle(button()).display).toBe("inline-flex");
+      expect(button().getAttribute("aria-pressed")).toBe("true");
+      button().focus();
+
+      mockPaneWidth(pane, 764);
+      observed.get(pane)?.();
+      expect(getComputedStyle(button()).display).toBe("none");
+      expect(document.activeElement).toBe(container);
+      expect(view.isWideMode()).toBe(true);
+      expect(container.style.getPropertyValue("--ms-wide-width")).toBe("");
+      expect(host.classList.contains("ms-wide-mode-host")).toBe(false);
+
+      mockPaneWidth(pane, 1200);
+      observed.get(pane)?.();
+      expect(getComputedStyle(button()).display).toBe("inline-flex");
+      expect(button().getAttribute("aria-pressed")).toBe("true");
+    } finally {
+      view.dispose();
+      style.remove();
+      vi.unstubAllGlobals();
+    }
   });
 
   it("should allow toggling wide mode on a standalone KanbanView", () => {
@@ -297,7 +409,7 @@ describe("Wide mode toggle and layout", () => {
     const elB = viewB.getElement();
     document.body.append(elA, elB);
 
-    elA.querySelector<HTMLButtonElement>(".ms-wide-mode-btn")?.click();
+    viewA.toggleWideMode();
     await Promise.resolve();
 
     expect(viewA.tableData.id).not.toBe(viewB.tableData.id);
@@ -342,7 +454,7 @@ describe("Wide mode toggle and layout", () => {
     expect(reloadedB.getElement().classList.contains("is-wide-mode")).toBe(false);
 
     // Turning wide mode back off removes it from saved settings.
-    reloadedA.getElement().querySelector<HTMLButtonElement>(".ms-wide-mode-btn")?.click();
+    reloadedA.toggleWideMode();
     await Promise.resolve();
     expect(reloadedSettings.getSettings().tableWideModes).toEqual({});
   });
